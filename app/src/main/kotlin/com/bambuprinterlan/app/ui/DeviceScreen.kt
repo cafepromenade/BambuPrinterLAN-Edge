@@ -325,6 +325,8 @@ private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
     var nozzleTarget by remember { mutableStateOf("") }
     var bedTarget by remember { mutableStateOf("") }
     var partFan by remember { mutableFloatStateOf((status?.coolingFanSpeed ?: 0).toFloat()) }
+    var auxFan by remember { mutableFloatStateOf(0f) }
+    var chamberFan by remember { mutableFloatStateOf(0f) }
     var step by remember { mutableFloatStateOf(10f) }
 
     if (showStopConfirm) {
@@ -418,6 +420,14 @@ private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
                 style = MaterialTheme.typography.labelLarge)
             Slider(value = partFan, onValueChange = { partFan = it },
                 onValueChangeFinished = { vm.send(Command.PartFan(partFan.toInt())) }, valueRange = 0f..100f)
+            Text(Bi("Aux fan", "輔助風扇").inline + ": ${auxFan.toInt()}%",
+                style = MaterialTheme.typography.labelLarge)
+            Slider(value = auxFan, onValueChange = { auxFan = it },
+                onValueChangeFinished = { vm.send(Command.AuxFan(auxFan.toInt())) }, valueRange = 0f..100f)
+            Text(Bi("Chamber fan", "機箱風扇").inline + ": ${chamberFan.toInt()}%",
+                style = MaterialTheme.typography.labelLarge)
+            Slider(value = chamberFan, onValueChange = { chamberFan = it },
+                onValueChangeFinished = { vm.send(Command.ChamberFan(chamberFan.toInt())) }, valueRange = 0f..100f)
 
             // Calibration
             Text(Bi("Calibration", "校準").inline, style = MaterialTheme.typography.labelLarge)

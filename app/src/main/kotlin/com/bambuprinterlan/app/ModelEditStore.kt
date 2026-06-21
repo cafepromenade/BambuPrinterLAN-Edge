@@ -16,6 +16,7 @@ data class EditState(
     val walls: Int = 2,
     val brim: Int = 0,
     val skirt: Int = 0,
+    val flowRatio: Float = 1.0f,
     val nozzleTemp: Int = 220,
     val bedTemp: Int = 60,
 )
@@ -39,6 +40,7 @@ object ModelEditStore {
             append("wall_loops = ").append(walls).append('\n')
             append("brim_loops = ").append(brim).append('\n')
             append("skirt_loops = ").append(skirt).append('\n')
+            append("flow_ratio = ").append(flowRatio).append('\n')
             append("nozzle_temp = ").append(nozzleTemp).append('\n')
             append("bed_temp = ").append(bedTemp).append('\n')
         }

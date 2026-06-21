@@ -196,9 +196,11 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     }
     float height = maxz - minz;
 
+    float flow = cfg(ini, "flow_ratio", 1.0f); if (flow <= 0.f) flow = 1.f;
+
     std::ofstream g(out);
     if (!g) return -3;
-    const float e_mm = (lw * lh) / 2.405f;
+    const float e_mm = (lw * lh) / 2.405f * flow;
     g << "; Bambu Printer LAN engine 0.3\n; tris=" << tris.size()
       << " lh=" << lh << " walls=" << walls << " infill=" << density << "%\n";
     g << "M140 S" << bedT << "\nM104 S" << nozzleT << "\n";

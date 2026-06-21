@@ -125,6 +125,12 @@ sealed interface Command {
         override val params get() = mapOf("param" to "M106 P2 S${(percent.coerceIn(0, 100) * 255 / 100)}\n")
     }
 
+    /** Chamber / exhaust fan (P3), 0–100 %. */
+    data class ChamberFan(val percent: Int) : Command {
+        override val category = "print"; override val command = "gcode_line"
+        override val params get() = mapOf("param" to "M106 P3 S${(percent.coerceIn(0, 100) * 255 / 100)}\n")
+    }
+
     // ---- calibration -------------------------------------------------------
     data class Calibrate(
         val bedLevel: Boolean = false,

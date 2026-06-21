@@ -120,6 +120,9 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                 Labeled(Bi("Skirt", "圍裙"), "${s.skirt}")
                 Slider(s.skirt.toFloat(), { v -> ModelEditStore.update { it.copy(skirt = v.toInt().coerceIn(0, 5)) } },
                     valueRange = 0f..5f)
+                Labeled(Bi("Flow ratio", "流量比"), "${(s.flowRatio * 100).toInt()}%")
+                Slider(s.flowRatio, { v -> ModelEditStore.update { it.copy(flowRatio = (Math.round(v * 100) / 100f)) } },
+                    valueRange = 0.9f..1.1f)
                 Labeled(Bi("Nozzle °C", "噴嘴 °C"), "${s.nozzleTemp}")
                 Slider(s.nozzleTemp.toFloat(), { v -> ModelEditStore.update { it.copy(nozzleTemp = v.toInt()) } },
                     valueRange = 170f..300f)
