@@ -81,6 +81,9 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                 Labeled(Bi("Walls", "牆數"), "${s.walls}")
                 Slider(s.walls.toFloat(), { v -> ModelEditStore.update { it.copy(walls = v.toInt().coerceIn(1, 5)) } },
                     valueRange = 1f..5f)
+                Labeled(Bi("Brim", "裙邊"), "${s.brim}")
+                Slider(s.brim.toFloat(), { v -> ModelEditStore.update { it.copy(brim = v.toInt().coerceIn(0, 10)) } },
+                    valueRange = 0f..10f)
                 Labeled(Bi("Nozzle °C", "噴嘴 °C"), "${s.nozzleTemp}")
                 Slider(s.nozzleTemp.toFloat(), { v -> ModelEditStore.update { it.copy(nozzleTemp = v.toInt()) } },
                     valueRange = 170f..300f)

@@ -116,8 +116,9 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
     fun slice() {
         val model = _models.value.firstOrNull()
         if (model == null) { _message.value = "Import a model first  請先匯入模型"; return }
-        if (!model.name.endsWith(".stl", ignoreCase = true)) {
-            _message.value = "Engine slices STL; ${model.name.substringAfterLast('.')} support is coming  暫只支援 STL"
+        val ext = model.name.substringAfterLast('.', "").lowercase()
+        if (ext != "stl" && ext != "obj") {
+            _message.value = "Engine slices STL/OBJ; $ext support is coming  暫支援 STL／OBJ"
             return
         }
         viewModelScope.launch {

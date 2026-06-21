@@ -65,6 +65,35 @@ void parse_ascii(const std::vector<char>& b, std::vector<Tri>& t) {
     }
 }
 
+bool looks_binary(const std::vector<char>& b) {
+    if (b.size() < 84) return false;
+    uint32_t c; std::memcpy(&c, b.data() + 80, 4);
+    return b.size() == 84ull + 50ull * c;
+}
+
+// Wavefront OBJ: vertices + faces (handles f a/b/c and polygon fans).
+void parse_obj(const std::vector<char>& b, std::vector<Tri>& t) {
+    std::string s(b.begin(), b.end()); std::istringstream in(s); std::string line;
+    std::vector<V3> verts;
+    while (std::getline(in, line)) {
+        if (line.size() < 2) continue;
+        if (line[0] == 'v' && line[1] == ' ') {
+            std::istringstream ls(line.substr(2)); V3 v{}; ls >> v.x >> v.y >> v.z; verts.push_back(v);
+        } else if (line[0] == 'f' && line[1] == ' ') {
+            std::istringstream ls(line.substr(2)); std::string w; std::vector<int> idx;
+            while (ls >> w) {
+                int vi = std::atoi(w.c_str());  // up to first '/' — atoi stops there
+                if (vi < 0) vi = (int)verts.size() + vi + 1;
+                if (vi >= 1 && vi <= (int)verts.size()) idx.push_back(vi - 1);
+            }
+            for (size_t i = 2; i < idx.size(); ++i) {
+                Tri tr; tr.v[0] = verts[idx[0]]; tr.v[1] = verts[idx[i - 1]]; tr.v[2] = verts[idx[i]];
+                t.push_back(tr);
+            }
+        }
+    }
+}
+
 float cfg(const std::string& ini, const char* key, float def) {
     auto p = ini.find(key); if (p == std::string::npos) return def;
     auto e = ini.find('=', p); if (e == std::string::npos) return def;
@@ -128,7 +157,9 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     std::vector<char> bytes;
     if (!read_file(in, bytes)) return -1;
     std::vector<Tri> tris;
-    if (is_ascii(bytes)) parse_ascii(bytes, tris); else parse_binary(bytes, tris);
+    if (is_ascii(bytes)) parse_ascii(bytes, tris);
+    else if (looks_binary(bytes)) parse_binary(bytes, tris);
+    else parse_obj(bytes, tris);  // OBJ (or other text mesh)
     if (tris.empty()) return -2;
 
     // ---- config ----
@@ -137,6 +168,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int walls = std::max(1, (int)cfg(ini, "wall_loops", 2));
     float density = std::min(100.f, std::max(0.f, cfg(ini, "infill_density", 15)));
     int solidN = std::max(0, (int)cfg(ini, "top_bottom_layers", 3));
+    int brim = std::max(0, (int)cfg(ini, "brim_loops", 0));
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
     float scale = cfg(ini, "scale", 1.0f); if (scale <= 0) scale = 1.f;
@@ -198,6 +230,25 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
         g << "; layer " << layers << " z=" << z << "\n";
         if (layers == 2) g << "M106 S255\n";
         g << "G1 Z" << z << " F600\n";
+
+        // brim: outward adhesion loops on the first printed layer
+        if (layers == 1 && brim > 0) {
+            for (const Loop& lp : loops) {
+                if (lp.size() < 3) continue;
+                float gx = 0, gy = 0; for (const Pt& p : lp) { gx += p.x; gy += p.y; }
+                gx /= lp.size(); gy /= lp.size();
+                for (int br = brim; br >= 1; --br) {
+                    float off = br * lw;
+                    Loop ring; ring.reserve(lp.size());
+                    for (const Pt& p : lp) {
+                        float dx = p.x - gx, dy = p.y - gy; float dl = std::sqrt(dx * dx + dy * dy);
+                        float k = dl > 0 ? (dl + off) / dl : 1.f;
+                        ring.push_back({gx + dx * k, gy + dy * k});
+                    }
+                    emit_path(ring, true);
+                }
+            }
+        }
 
         // perimeters: outer loop + inward offsets toward centroid
         for (const Loop& lp : loops) {
