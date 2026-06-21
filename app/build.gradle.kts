@@ -20,8 +20,8 @@ android {
         applicationId = "com.bambuprinterlan.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "0.1.0"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "310").toInt()
+        versionName = "0.3.1"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -32,6 +32,11 @@ android {
                 storePassword = System.getenv("RELEASE_STORE_PASSWORD")
                 keyAlias = System.getenv("RELEASE_KEY_ALIAS")
                 keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                // Sign with v1+v2+v3 for the widest device compatibility.
+                // v2-only caused "App not installed" on some installers/OEMs.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
