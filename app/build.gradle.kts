@@ -20,8 +20,8 @@ android {
         applicationId = "com.bambuprinterlan.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "310").toInt()
-        versionName = "0.3.1"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "320").toInt()
+        versionName = "0.3.2"
         vectorDrawables { useSupportLibrary = true }
     }
 
