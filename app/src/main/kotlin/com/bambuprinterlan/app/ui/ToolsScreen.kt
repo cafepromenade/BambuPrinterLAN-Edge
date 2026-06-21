@@ -41,6 +41,7 @@ fun ToolsScreen(
     onOpenFidget: () -> Unit = {},
     onOpenAssistant: () -> Unit = {},
     onOpenAutoFix: () -> Unit = {},
+    onOpenModelEdit: () -> Unit = {},
 ) {
     val toggles by vm.flags.collectAsState()
     LazyColumn(
@@ -70,6 +71,11 @@ fun ToolsScreen(
         item {
             androidx.compose.material3.OutlinedButton(onClick = onOpenAutoFix, modifier = Modifier.fillMaxWidth()) {
                 Text(Bi("Auto-Fix Dashboard", "自動修復面板").inline)
+            }
+        }
+        item {
+            androidx.compose.material3.Button(onClick = onOpenModelEdit, modifier = Modifier.fillMaxWidth()) {
+                Text(Bi("Model Edit Lab", "模型編輯實驗室").inline)
             }
         }
         item {

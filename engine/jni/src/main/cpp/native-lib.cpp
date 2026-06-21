@@ -1,11 +1,13 @@
-// Bambu Printer LAN — native slicing engine.
+// Bambu Printer LAN — native slicing engine (v0.3).
 //
-// A real (if minimal) slicer: parses an STL (binary or ASCII), slices it into
-// layers at the configured layer height, chains the per-layer contour segments
-// into perimeter polylines, and emits printable G-code. This is the first-party
-// engine seam; full libslic3r features layer on top of this.
+// A real FDM slicer: parses STL (binary/ASCII), applies a model transform
+// (scale / rotate-Z / move / drop-to-plate / center), slices into layers, and
+// for each layer emits N perimeter loops plus rectilinear infill clipped to the
+// contours (even-odd scanline), with solid top/bottom layers, temperatures,
+// retraction and part-cooling fan. Config comes as `key = value` lines.
 #include <jni.h>
 #include <android/log.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -20,189 +22,237 @@
 
 namespace {
 
-struct Vec3 { float x, y, z; };
-struct Tri  { Vec3 v[3]; };
-struct Seg  { float x0, y0, x1, y1; };
+struct V3 { float x, y, z; };
+struct Tri { V3 v[3]; };
+struct Pt { float x, y; };
+struct Seg { float x0, y0, x1, y1; };
+using Loop = std::vector<Pt>;
 
-bool read_file(const std::string& path, std::vector<char>& out) {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
+bool read_file(const std::string& p, std::vector<char>& out) {
+    std::ifstream f(p, std::ios::binary | std::ios::ate);
     if (!f) return false;
     std::streamsize n = f.tellg();
     if (n <= 0) return false;
-    f.seekg(0);
-    out.resize(static_cast<size_t>(n));
-    return static_cast<bool>(f.read(out.data(), n));
+    f.seekg(0); out.resize((size_t)n);
+    return (bool)f.read(out.data(), n);
 }
 
-bool is_ascii_stl(const std::vector<char>& b) {
-    if (b.size() < 6) return false;
-    if (std::strncmp(b.data(), "solid", 5) != 0) return false;
-    if (b.size() >= 84) {
-        uint32_t count = 0;
-        std::memcpy(&count, b.data() + 80, 4);
-        if (b.size() == 84ull + 50ull * count) return false;  // matches binary layout
-    }
+bool is_ascii(const std::vector<char>& b) {
+    if (b.size() < 6 || std::strncmp(b.data(), "solid", 5) != 0) return false;
+    if (b.size() >= 84) { uint32_t c; std::memcpy(&c, b.data() + 80, 4);
+        if (b.size() == 84ull + 50ull * c) return false; }
     return true;
 }
 
-void parse_binary(const std::vector<char>& b, std::vector<Tri>& tris) {
+void parse_binary(const std::vector<char>& b, std::vector<Tri>& t) {
     if (b.size() < 84) return;
-    uint32_t count = 0;
-    std::memcpy(&count, b.data() + 80, 4);
-    size_t need = 84ull + 50ull * count;
-    if (b.size() < need) count = static_cast<uint32_t>((b.size() - 84) / 50);
-    tris.reserve(count);
-    const char* p = b.data() + 84;
-    for (uint32_t i = 0; i < count; ++i, p += 50) {
-        Tri t;
-        float f[9];
-        std::memcpy(f, p + 12, sizeof(f));  // skip 12-byte normal, read 9 floats
-        for (int k = 0; k < 3; ++k) {
-            t.v[k].x = f[k * 3 + 0];
-            t.v[k].y = f[k * 3 + 1];
-            t.v[k].z = f[k * 3 + 2];
-        }
-        tris.push_back(t);
+    uint32_t c; std::memcpy(&c, b.data() + 80, 4);
+    if (b.size() < 84ull + 50ull * c) c = (uint32_t)((b.size() - 84) / 50);
+    t.reserve(c); const char* p = b.data() + 84;
+    for (uint32_t i = 0; i < c; ++i, p += 50) {
+        Tri tr; float f[9]; std::memcpy(f, p + 12, sizeof(f));
+        for (int k = 0; k < 3; ++k) { tr.v[k] = {f[k*3], f[k*3+1], f[k*3+2]}; }
+        t.push_back(tr);
     }
 }
 
-void parse_ascii(const std::vector<char>& b, std::vector<Tri>& tris) {
-    std::string s(b.begin(), b.end());
-    std::istringstream in(s);
-    std::string tok;
-    Tri t; int vi = 0;
-    while (in >> tok) {
-        if (tok == "vertex") {
-            in >> t.v[vi].x >> t.v[vi].y >> t.v[vi].z;
-            if (++vi == 3) { tris.push_back(t); vi = 0; }
-        }
+void parse_ascii(const std::vector<char>& b, std::vector<Tri>& t) {
+    std::string s(b.begin(), b.end()); std::istringstream in(s); std::string tok;
+    Tri tr; int vi = 0;
+    while (in >> tok) if (tok == "vertex") {
+        in >> tr.v[vi].x >> tr.v[vi].y >> tr.v[vi].z;
+        if (++vi == 3) { t.push_back(tr); vi = 0; }
     }
 }
 
-void slice_tri(const Tri& t, float zp, std::vector<Seg>& segs) {
-    float pts[2][2];
-    int n = 0;
+float cfg(const std::string& ini, const char* key, float def) {
+    auto p = ini.find(key); if (p == std::string::npos) return def;
+    auto e = ini.find('=', p); if (e == std::string::npos) return def;
+    char* end = nullptr; float v = std::strtof(ini.c_str() + e + 1, &end);
+    return end == ini.c_str() + e + 1 ? def : v;
+}
+
+bool tri_seg(const Tri& t, float z, Seg& s) {
+    float p[2][2]; int n = 0;
     for (int e = 0; e < 3 && n < 2; ++e) {
-        const Vec3& a = t.v[e];
-        const Vec3& c = t.v[(e + 1) % 3];
-        float za = a.z - zp, zc = c.z - zp;
-        if ((za > 0 && zc > 0) || (za < 0 && zc < 0)) continue;
-        if (za == zc) continue;
+        const V3& a = t.v[e]; const V3& c = t.v[(e + 1) % 3];
+        float za = a.z - z, zc = c.z - z;
+        if ((za > 0 && zc > 0) || (za < 0 && zc < 0) || za == zc) continue;
         float u = za / (za - zc);
-        pts[n][0] = a.x + u * (c.x - a.x);
-        pts[n][1] = a.y + u * (c.y - a.y);
-        ++n;
+        p[n][0] = a.x + u * (c.x - a.x); p[n][1] = a.y + u * (c.y - a.y); ++n;
     }
-    if (n == 2) segs.push_back({pts[0][0], pts[0][1], pts[1][0], pts[1][1]});
+    if (n != 2) return false;
+    s = {p[0][0], p[0][1], p[1][0], p[1][1]}; return true;
 }
 
-std::vector<std::vector<std::pair<float, float>>> chain(std::vector<Seg> segs) {
-    std::vector<std::vector<std::pair<float, float>>> loops;
-    std::vector<bool> used(segs.size(), false);
-    const float eps = 0.01f;
+std::vector<Loop> chain(std::vector<Seg> segs) {
+    std::vector<Loop> loops; std::vector<bool> used(segs.size(), false);
+    const float eps = 0.02f;
     for (size_t i = 0; i < segs.size(); ++i) {
-        if (used[i]) continue;
-        used[i] = true;
-        std::vector<std::pair<float, float>> poly;
-        poly.push_back(std::make_pair(segs[i].x0, segs[i].y0));
-        float ex = segs[i].x1, ey = segs[i].y1;
-        poly.push_back(std::make_pair(ex, ey));
-        bool extended = true;
-        while (extended) {
-            extended = false;
+        if (used[i]) continue; used[i] = true;
+        Loop lp; lp.push_back({segs[i].x0, segs[i].y0});
+        float ex = segs[i].x1, ey = segs[i].y1; lp.push_back({ex, ey});
+        bool ext = true;
+        while (ext) { ext = false;
             for (size_t j = 0; j < segs.size(); ++j) {
                 if (used[j]) continue;
-                if (std::fabs(segs[j].x0 - ex) < eps && std::fabs(segs[j].y0 - ey) < eps) {
-                    ex = segs[j].x1; ey = segs[j].y1;
-                } else if (std::fabs(segs[j].x1 - ex) < eps && std::fabs(segs[j].y1 - ey) < eps) {
-                    ex = segs[j].x0; ey = segs[j].y0;
-                } else continue;
-                used[j] = true;
-                poly.push_back(std::make_pair(ex, ey));
-                extended = true;
-                break;
+                if (std::fabs(segs[j].x0 - ex) < eps && std::fabs(segs[j].y0 - ey) < eps) { ex = segs[j].x1; ey = segs[j].y1; }
+                else if (std::fabs(segs[j].x1 - ex) < eps && std::fabs(segs[j].y1 - ey) < eps) { ex = segs[j].x0; ey = segs[j].y0; }
+                else continue;
+                used[j] = true; lp.push_back({ex, ey}); ext = true; break;
             }
         }
-        loops.push_back(std::move(poly));
+        loops.push_back(std::move(lp));
     }
     return loops;
-}
-
-float parse_layer_height(const std::string& ini) {
-    auto pos = ini.find("layer_height");
-    if (pos == std::string::npos) return 0.2f;
-    auto eq = ini.find('=', pos);
-    if (eq == std::string::npos) return 0.2f;
-    float v = std::strtof(ini.c_str() + eq + 1, nullptr);
-    return (v > 0.01f && v < 2.0f) ? v : 0.2f;
 }
 
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_bambuprinterlan_engine_SlicerBridge_nativeEngineVersion(JNIEnv* env, jobject) {
-    return env->NewStringUTF("Bambu Printer LAN native engine 0.2 (STL slicer)");
+    return env->NewStringUTF("Bambu Printer LAN engine 0.3 (perimeters + infill + solid)");
 }
 
-// Slice an STL to G-code. Returns the number of layers, or a negative error code.
 extern "C" JNIEXPORT jint JNICALL
 Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
         JNIEnv* env, jobject, jstring jin, jstring jout, jstring jcfg) {
-    const char* cin = env->GetStringUTFChars(jin, nullptr);
-    const char* cout = env->GetStringUTFChars(jout, nullptr);
-    const char* ccfg = env->GetStringUTFChars(jcfg, nullptr);
-    std::string in = cin ? cin : "";
-    std::string out = cout ? cout : "";
-    std::string cfg = ccfg ? ccfg : "";
-    if (cin) env->ReleaseStringUTFChars(jin, cin);
-    if (cout) env->ReleaseStringUTFChars(jout, cout);
-    if (ccfg) env->ReleaseStringUTFChars(jcfg, ccfg);
+    const char* ci = env->GetStringUTFChars(jin, nullptr);
+    const char* co = env->GetStringUTFChars(jout, nullptr);
+    const char* cc = env->GetStringUTFChars(jcfg, nullptr);
+    std::string in = ci ? ci : "", out = co ? co : "", ini = cc ? cc : "";
+    if (ci) env->ReleaseStringUTFChars(jin, ci);
+    if (co) env->ReleaseStringUTFChars(jout, co);
+    if (cc) env->ReleaseStringUTFChars(jcfg, cc);
 
     std::vector<char> bytes;
     if (!read_file(in, bytes)) return -1;
-
     std::vector<Tri> tris;
-    if (is_ascii_stl(bytes)) parse_ascii(bytes, tris);
-    else parse_binary(bytes, tris);
+    if (is_ascii(bytes)) parse_ascii(bytes, tris); else parse_binary(bytes, tris);
     if (tris.empty()) return -2;
 
-    float minz = 1e30f, maxz = -1e30f;
-    for (const Tri& t : tris)
-        for (int k = 0; k < 3; ++k) {
-            minz = std::fmin(minz, t.v[k].z);
-            maxz = std::fmax(maxz, t.v[k].z);
-        }
-    float lh = parse_layer_height(cfg);
+    // ---- config ----
+    float lh = cfg(ini, "layer_height", 0.2f); if (lh < 0.04f || lh > 1.0f) lh = 0.2f;
+    float lw = cfg(ini, "line_width", 0.42f);
+    int walls = std::max(1, (int)cfg(ini, "wall_loops", 2));
+    float density = std::min(100.f, std::max(0.f, cfg(ini, "infill_density", 15)));
+    int solidN = std::max(0, (int)cfg(ini, "top_bottom_layers", 3));
+    int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
+    int bedT = (int)cfg(ini, "bed_temp", 60);
+    float scale = cfg(ini, "scale", 1.0f); if (scale <= 0) scale = 1.f;
+    float rot = cfg(ini, "rotate_z", 0.f) * 3.14159265f / 180.f;
+    float moveX = cfg(ini, "move_x", 0.f), moveY = cfg(ini, "move_y", 0.f);
+    float cx = cfg(ini, "plate_x", 128.f), cy = cfg(ini, "plate_y", 128.f);
+    bool center = cfg(ini, "center", 1.f) != 0.f;
+
+    // ---- transform: scale, rotate-Z ----
+    float cosr = std::cos(rot), sinr = std::sin(rot);
+    float minx = 1e30f, maxx = -1e30f, miny = 1e30f, maxy = -1e30f, minz = 1e30f, maxz = -1e30f;
+    for (Tri& t : tris) for (int k = 0; k < 3; ++k) {
+        float x = t.v[k].x * scale, y = t.v[k].y * scale, z = t.v[k].z * scale;
+        t.v[k].x = x * cosr - y * sinr; t.v[k].y = x * sinr + y * cosr; t.v[k].z = z;
+        minx = std::fmin(minx, t.v[k].x); maxx = std::fmax(maxx, t.v[k].x);
+        miny = std::fmin(miny, t.v[k].y); maxy = std::fmax(maxy, t.v[k].y);
+        minz = std::fmin(minz, t.v[k].z); maxz = std::fmax(maxz, t.v[k].z);
+    }
+    float tx = moveX - (center ? (minx + maxx) * 0.5f - cx : 0.f);
+    float ty = moveY - (center ? (miny + maxy) * 0.5f - cy : 0.f);
+    for (Tri& t : tris) for (int k = 0; k < 3; ++k) {
+        t.v[k].x += tx; t.v[k].y += ty; t.v[k].z -= minz;
+    }
+    float height = maxz - minz;
 
     std::ofstream g(out);
     if (!g) return -3;
-    g << "; Bambu Printer LAN native engine 0.2\n";
-    g << "; triangles=" << tris.size() << " layer_height=" << lh << "\n";
-    g << "G21 ; mm\nG90 ; absolute\nM83 ; relative extrusion\nG28 ; home\n";
+    const float e_mm = (lw * lh) / 2.405f;
+    g << "; Bambu Printer LAN engine 0.3\n; tris=" << tris.size()
+      << " lh=" << lh << " walls=" << walls << " infill=" << density << "%\n";
+    g << "M140 S" << bedT << "\nM104 S" << nozzleT << "\n";
+    g << "M190 S" << bedT << "\nM109 S" << nozzleT << "\n";
+    g << "G21\nG90\nM82\nG28\nG92 E0\n";
+    g << "G1 Z0.2 F600\nG1 X5 Y5 F3000\nG1 X150 Y5 E15 F1000\nG92 E0\nM83\n";
 
+    auto emit_path = [&](const std::vector<Pt>& pts, bool close) {
+        if (pts.size() < 2) return;
+        g << "G1 E-0.8 F1800\n";
+        g << "G0 X" << pts[0].x << " Y" << pts[0].y << " F6000\n";
+        g << "G1 E0.8 F1800\n";
+        size_t cnt = pts.size() + (close ? 1 : 0);
+        for (size_t i = 1; i < cnt; ++i) {
+            const Pt& a = pts[(i - 1) % pts.size()]; const Pt& b = pts[i % pts.size()];
+            float dx = b.x - a.x, dy = b.y - a.y; float d = std::sqrt(dx * dx + dy * dy);
+            if (d < 1e-4f) continue;
+            g << "G1 X" << b.x << " Y" << b.y << " E" << (d * e_mm) << " F1500\n";
+        }
+    };
+
+    int approxLayers = (int)(height / lh);
     int layers = 0;
-    const float e_per_mm = 0.04f;
-    for (float z = minz + lh * 0.5f; z <= maxz; z += lh) {
-        std::vector<Seg> segs;
-        for (const Tri& t : tris) slice_tri(t, z, segs);
+    int li = 0;
+    for (float z = lh * 0.5f; z <= height; z += lh, ++li) {
+        std::vector<Seg> segs; Seg s;
+        for (const Tri& t : tris) if (tri_seg(t, z, s)) segs.push_back(s);
         if (segs.empty()) continue;
+        std::vector<Loop> loops = chain(segs);
         ++layers;
         g << "; layer " << layers << " z=" << z << "\n";
+        if (layers == 2) g << "M106 S255\n";
         g << "G1 Z" << z << " F600\n";
-        for (auto& loop : chain(segs)) {
-            if (loop.size() < 2) continue;
-            g << "G0 X" << loop[0].first << " Y" << loop[0].second << " F4800\n";
-            for (size_t i = 1; i < loop.size(); ++i) {
-                float dx = loop[i].first - loop[i - 1].first;
-                float dy = loop[i].second - loop[i - 1].second;
-                float ext = std::sqrt(dx * dx + dy * dy) * e_per_mm;
-                g << "G1 X" << loop[i].first << " Y" << loop[i].second
-                  << " E" << ext << " F1800\n";
+
+        // perimeters: outer loop + inward offsets toward centroid
+        for (const Loop& lp : loops) {
+            if (lp.size() < 3) continue;
+            float gx = 0, gy = 0; for (const Pt& p : lp) { gx += p.x; gy += p.y; }
+            gx /= lp.size(); gy /= lp.size();
+            for (int w = 0; w < walls; ++w) {
+                float off = w * lw;
+                Loop ring; ring.reserve(lp.size());
+                for (const Pt& p : lp) {
+                    float dx = p.x - gx, dy = p.y - gy; float dl = std::sqrt(dx * dx + dy * dy);
+                    float k = dl > off ? (dl - off) / dl : 0.f;
+                    ring.push_back({gx + dx * k, gy + dy * k});
+                }
+                emit_path(ring, true);
+            }
+        }
+
+        // infill: even-odd scanline; solid on top/bottom layers
+        bool solid = (li < solidN) || (z > height - solidN * lh);
+        float dens = solid ? 100.f : density;
+        if (dens > 0.5f) {
+            float spacing = lw / (dens / 100.f);
+            bool vertical = (li % 2) == 1;
+            float a0 = 1e30f, a1 = -1e30f;
+            for (const Loop& lp : loops) for (const Pt& p : lp) {
+                float c = vertical ? p.x : p.y; a0 = std::fmin(a0, c); a1 = std::fmax(a1, c);
+            }
+            for (float a = a0 + spacing * 0.5f; a < a1; a += spacing) {
+                std::vector<float> xs;
+                for (const Loop& lp : loops) {
+                    size_t m = lp.size();
+                    for (size_t i = 0; i < m; ++i) {
+                        const Pt& p1 = lp[i]; const Pt& p2 = lp[(i + 1) % m];
+                        float c1 = vertical ? p1.x : p1.y, c2 = vertical ? p2.x : p2.y;
+                        if ((c1 <= a && c2 > a) || (c2 <= a && c1 > a)) {
+                            float u = (a - c1) / (c2 - c1);
+                            float b1 = vertical ? p1.y : p1.x, b2 = vertical ? p2.y : p2.x;
+                            xs.push_back(b1 + u * (b2 - b1));
+                        }
+                    }
+                }
+                std::sort(xs.begin(), xs.end());
+                for (size_t i = 0; i + 1 < xs.size(); i += 2) {
+                    Pt A = vertical ? Pt{a, xs[i]} : Pt{xs[i], a};
+                    Pt B = vertical ? Pt{a, xs[i + 1]} : Pt{xs[i + 1], a};
+                    std::vector<Pt> line = {A, B};
+                    emit_path(line, false);
+                }
             }
         }
     }
-    g << "M104 S0\nM140 S0\nG28 X0 Y0\n; done\n";
+
+    g << "M104 S0\nM140 S0\nM107\nG1 Z" << (height + 5) << " F600\nG28 X0 Y0\n; done\n";
     g.flush();
-    LOGI("sliced %s -> %d layers", in.c_str(), layers);
+    LOGI("sliced %s -> %d/%d layers", in.c_str(), layers, approxLayers);
     return layers;
 }

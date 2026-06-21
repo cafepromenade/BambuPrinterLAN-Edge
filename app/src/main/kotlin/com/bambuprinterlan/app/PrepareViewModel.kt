@@ -131,7 +131,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
                     } ?: error("Could not read model")
                     val out = File(ctx.cacheDir, "output.gcode")
                     val layers = com.bambuprinterlan.engine.SlicerBridge.slice(
-                        input.absolutePath, out.absolutePath, "layer_height = 0.2",
+                        input.absolutePath, out.absolutePath, ModelEditStore.configIni(),
                     )
                     Pair(layers, out)
                 }

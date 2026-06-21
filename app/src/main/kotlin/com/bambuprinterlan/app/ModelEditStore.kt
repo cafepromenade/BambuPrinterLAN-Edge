@@ -1,0 +1,42 @@
+package com.bambuprinterlan.app
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/** Model transform + slice settings, consumed by the native slicer. */
+data class EditState(
+    val scale: Float = 1f,
+    val rotateZ: Float = 0f,
+    val moveX: Float = 0f,
+    val moveY: Float = 0f,
+    val center: Boolean = true,
+    val layerHeight: Float = 0.2f,
+    val infill: Int = 15,
+    val walls: Int = 2,
+    val nozzleTemp: Int = 220,
+    val bedTemp: Int = 60,
+)
+
+object ModelEditStore {
+    private val _state = MutableStateFlow(EditState())
+    val state: StateFlow<EditState> = _state.asStateFlow()
+
+    fun update(transform: (EditState) -> EditState) { _state.value = transform(_state.value) }
+
+    /** Build the `key = value` config the native engine reads. */
+    fun configIni(): String = with(_state.value) {
+        buildString {
+            append("scale = ").append(scale).append('\n')
+            append("rotate_z = ").append(rotateZ).append('\n')
+            append("move_x = ").append(moveX).append('\n')
+            append("move_y = ").append(moveY).append('\n')
+            append("center = ").append(if (center) 1 else 0).append('\n')
+            append("layer_height = ").append(layerHeight).append('\n')
+            append("infill_density = ").append(infill).append('\n')
+            append("wall_loops = ").append(walls).append('\n')
+            append("nozzle_temp = ").append(nozzleTemp).append('\n')
+            append("bed_temp = ").append(bedTemp).append('\n')
+        }
+    }
+}
