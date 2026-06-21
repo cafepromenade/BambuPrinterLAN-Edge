@@ -163,6 +163,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching {
                     t.status().collect { st ->
                         _status.value = st
+                        CommandBus.publishStatus(st)
                         maybeNotify(st)
                         updateNotification(st)
                     }
@@ -208,6 +209,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                         fileName = "Metadata/plate_1.gcode",
                         url = "ftp:///$name",
                         subtaskName = name.removeSuffix(".3mf"),
+                        amsMapping = AmsMappingStore.mapping.value,
                     )
                 )
                 _message.value = "Print started  已開始列印"

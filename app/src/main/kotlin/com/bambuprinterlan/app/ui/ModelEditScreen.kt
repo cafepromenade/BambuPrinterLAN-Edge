@@ -1,13 +1,23 @@
 package com.bambuprinterlan.app.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import com.bambuprinterlan.app.Mesh
+import com.bambuprinterlan.app.MeshLoader
+import com.bambuprinterlan.app.WorkspaceStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.Card
@@ -45,7 +55,30 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
             BiText(Bi("Model Edit Lab", "模型編輯實驗室"),
                 enSize = MaterialTheme.typography.headlineSmall.fontSize)
         }
-        BiBody(Bi("Applied when you slice in Prepare.", "喺準備頁切片時套用。"))
+        BiBody(Bi("Drag to orbit · pinch to zoom · applied when you slice.",
+            "拖曳旋轉 · 兩指縮放 · 切片時套用。"))
+
+        // 3D viewport of the imported model, reflecting the live transform.
+        val ctx = LocalContext.current
+        val model by WorkspaceStore.firstModel.collectAsState()
+        val mesh by produceState<Mesh?>(initialValue = null, model) {
+            val m = model
+            value = if (m == null) null else withContext(Dispatchers.IO) {
+                runCatching {
+                    val ext = m.second.substringAfterLast('.', "")
+                    ctx.contentResolver.openInputStream(Uri.parse(m.first))?.use { MeshLoader.load(it, ext) }
+                }.getOrNull()
+            }
+        }
+        Card(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(280.dp)) {
+                val mm = mesh
+                if (mm != null) Model3DView(mm, s.scale, s.rotateZ, Modifier.fillMaxSize())
+                else BiBody(Bi("Import a model in Prepare to view it in 3D.",
+                    "喺準備頁匯入模型即可 3D 預覽。"),
+                    modifier = Modifier.align(Alignment.Center).padding(16.dp))
+            }
+        }
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

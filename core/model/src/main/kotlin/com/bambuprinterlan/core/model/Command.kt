@@ -154,6 +154,37 @@ sealed interface Command {
         override val params get() = mapOf("action" to action)
     }
 
+    /** Load filament from a tray to the nozzle (heats + feeds). */
+    data class AmsLoad(val trayId: Int, val tempMin: Int = 220, val tempMax: Int = 240) : Command {
+        override val category = "print"; override val command = "ams_change_filament"
+        override val params get() = mapOf("target" to trayId, "curr_temp" to tempMin, "tar_temp" to tempMax)
+    }
+
+    /** Unload the currently loaded filament (target 255 = unload). */
+    data object AmsUnload : Command {
+        override val category = "print"; override val command = "ams_change_filament"
+        override val params = mapOf<String, Any?>("target" to 255, "curr_temp" to 220, "tar_temp" to 220)
+    }
+
+    /** Assign what filament is in a tray (type, color, temp range). */
+    data class SetTrayFilament(
+        val amsId: Int,
+        val trayId: Int,
+        val trayType: String,           // "PLA","PETG","ABS",...
+        val colorHex: String,           // "RRGGBBAA"
+        val nozzleTempMin: Int,
+        val nozzleTempMax: Int,
+        val trayInfoIdx: String = "",   // Bambu filament preset id (e.g. "GFL99")
+    ) : Command {
+        override val category = "print"; override val command = "ams_filament_setting"
+        override val params get() = mapOf(
+            "ams_id" to amsId, "tray_id" to trayId,
+            "tray_info_idx" to trayInfoIdx, "tray_type" to trayType,
+            "tray_color" to colorHex.uppercase(),
+            "nozzle_temp_min" to nozzleTempMin, "nozzle_temp_max" to nozzleTempMax,
+        )
+    }
+
     // ---- misc --------------------------------------------------------------
     data object StopBuzzer : Command {
         override val category = "system"; override val command = "set_accessories"

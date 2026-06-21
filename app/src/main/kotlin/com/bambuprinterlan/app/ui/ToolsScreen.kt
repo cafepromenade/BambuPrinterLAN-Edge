@@ -42,6 +42,8 @@ fun ToolsScreen(
     onOpenAssistant: () -> Unit = {},
     onOpenAutoFix: () -> Unit = {},
     onOpenModelEdit: () -> Unit = {},
+    onOpenFilament: () -> Unit = {},
+    onOpenCalibration: () -> Unit = {},
 ) {
     val toggles by vm.flags.collectAsState()
     LazyColumn(
@@ -74,8 +76,18 @@ fun ToolsScreen(
             }
         }
         item {
+            androidx.compose.material3.Button(onClick = onOpenFilament, modifier = Modifier.fillMaxWidth()) {
+                Text(Bi("Filament / AMS", "線材 / AMS").inline)
+            }
+        }
+        item {
+            androidx.compose.material3.OutlinedButton(onClick = onOpenCalibration, modifier = Modifier.fillMaxWidth()) {
+                Text(Bi("Calibration", "校正").inline)
+            }
+        }
+        item {
             androidx.compose.material3.Button(onClick = onOpenModelEdit, modifier = Modifier.fillMaxWidth()) {
-                Text(Bi("Model Edit Lab", "模型編輯實驗室").inline)
+                Text(Bi("Model Edit Lab (3D)", "模型編輯（3D）").inline)
             }
         }
         item {

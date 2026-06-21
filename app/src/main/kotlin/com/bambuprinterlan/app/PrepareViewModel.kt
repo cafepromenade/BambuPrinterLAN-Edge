@@ -44,7 +44,10 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         // Restore the auto-saved workspace.
-        viewModelScope.launch { _models.value = parseWorkspace(repo.workspaceJson().first()) }
+        viewModelScope.launch {
+            _models.value = parseWorkspace(repo.workspaceJson().first())
+            publishFirst()
+        }
         // Periodic auto-save (port of the 120s desktop auto-save timer).
         viewModelScope.launch {
             while (true) {
@@ -55,6 +58,11 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun persistWorkspace() = repo.saveWorkspace(serializeWorkspace(_models.value))
+
+    private fun publishFirst() {
+        val m = _models.value.firstOrNull()
+        WorkspaceStore.setFirst(m?.uri, m?.name)
+    }
 
     private fun autoSaveNow() {
         viewModelScope.launch { if (repo.getBool("material_auto_save").first()) persistWorkspace() }
@@ -100,6 +108,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
         }
         _models.value = _models.value + ImportedModel(name, uri.toString(), size)
         _message.value = "Imported $name  已匯入"
+        publishFirst()
         autoSaveNow()
     }
 
@@ -110,6 +119,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
 
     fun remove(model: ImportedModel) {
         _models.value = _models.value - model
+        publishFirst()
         autoSaveNow()
     }
 

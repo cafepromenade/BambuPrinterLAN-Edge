@@ -35,6 +35,8 @@ import androidx.navigation.compose.rememberNavController
 import com.bambuprinterlan.app.nav.Dest
 import com.bambuprinterlan.app.ui.AssistantScreen
 import com.bambuprinterlan.app.ui.AutoFixScreen
+import com.bambuprinterlan.app.ui.CalibrationScreen
+import com.bambuprinterlan.app.ui.FilamentScreen
 import com.bambuprinterlan.app.ui.ModelEditScreen
 import com.bambuprinterlan.app.ui.BatchSenderScreen
 import com.bambuprinterlan.app.ui.DeviceScreen
@@ -129,6 +131,8 @@ fun BambuPrinterLanApp() {
                     onOpenAssistant = { navController.navigate("assistant") },
                     onOpenAutoFix = { navController.navigate("autofix") },
                     onOpenModelEdit = { navController.navigate("modeledit") },
+                    onOpenFilament = { navController.navigate("filament") },
+                    onOpenCalibration = { navController.navigate("calibration") },
                 )
             }
             composable("fidget") {
@@ -139,6 +143,12 @@ fun BambuPrinterLanApp() {
             }
             composable("modeledit") {
                 ModelEditScreen(onBack = { navController.popBackStack() })
+            }
+            composable("filament") {
+                FilamentScreen(onBack = { navController.popBackStack() })
+            }
+            composable("calibration") {
+                CalibrationScreen(onBack = { navController.popBackStack() })
             }
             composable("autofix") {
                 AutoFixScreen(onBack = { navController.popBackStack() })
