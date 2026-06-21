@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- "BD" monogram for BambuPrinterLan -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,38h12a9,9 0,0 1,0 18h-12z M36,56h13a9,9 0,0 1,0 18h-13z M40,42v8h8a4,4 0,0 0,0 -8z M40,60v10h9a5,5 0,0 0,0 -10z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,38h11a18,18 0,0 1,0 36h-11z M62,42v28h7a14,14 0,0 0,0 -28z" />
+</vector>

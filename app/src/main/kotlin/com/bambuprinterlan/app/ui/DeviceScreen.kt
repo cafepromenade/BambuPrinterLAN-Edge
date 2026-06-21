@@ -1,0 +1,355 @@
+package com.bambuprinterlan.app.ui
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import com.bambuprinterlan.app.DeviceViewModel
+import com.bambuprinterlan.core.design.Bi
+import com.bambuprinterlan.core.design.BiBody
+import com.bambuprinterlan.core.design.BiText
+import com.bambuprinterlan.core.model.Command
+import com.bambuprinterlan.core.model.DeviceStatus
+import com.bambuprinterlan.core.model.SpeedLevel
+
+/**
+ * Device 裝置 — connect via relay (LAN-direct MQTT lands in Phase 4), then view
+ * live status and control the printer. Every label is bilingual. Secrets stay
+ * on-device.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DeviceScreen(vm: DeviceViewModel = viewModel()) {
+    val status by vm.status.collectAsState()
+    val connected by vm.connected.collectAsState()
+    val message by vm.message.collectAsState()
+    val savedPrinters by vm.savedPrinters.collectAsState()
+    val relayPrinters by vm.relayPrinters.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var serial by remember { mutableStateOf("") }
+    var ip by remember { mutableStateOf("") }
+    var accessCode by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BiText(Bi("Device", "裝置"), enSize = MaterialTheme.typography.headlineSmall.fontSize)
+        message?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
+
+        if (savedPrinters.isNotEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BiText(Bi("Saved printers", "已儲存打印機"))
+                    savedPrinters.forEach { p ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { ip = p.ip; accessCode = p.accessCode; serial = p.serial },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text((p.name.ifBlank { p.serial }) + "  ${p.ip}")
+                            }
+                            IconButton(onClick = { vm.removeSavedPrinter(p) }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Remove  移除")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                BiText(Bi("Connect", "連線"))
+                BiBody(Bi("LAN-direct (IP + access code) or via the relay (set in Settings).",
+                    "LAN 直連（IP + 存取碼）或經中繼（喺設定填）。"))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        com.bambuprinterlan.app.scanQrCode(context, onResult = {
+                            val p = com.bambuprinterlan.app.parsePrinterQr(it)
+                            if (p.serial.isNotBlank()) serial = p.serial
+                            if (p.ip.isNotBlank()) ip = p.ip
+                            if (p.accessCode.isNotBlank()) accessCode = p.accessCode
+                        }, onError = { /* surfaced by scanner UI */ })
+                    }) { Text(Bi("Scan QR", "掃描 QR").inline) }
+                }
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    label = { Text(Bi("Name (optional)", "名稱（可選）").inline) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = serial, onValueChange = { serial = it },
+                    label = { Text(Bi("Printer serial", "打印機序號").inline) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = ip, onValueChange = { ip = it },
+                    label = { Text(Bi("Printer IP (LAN)", "打印機 IP（LAN）").inline) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = accessCode, onValueChange = { accessCode = it },
+                    label = { Text(Bi("Access code (LAN)", "存取碼（LAN）").inline) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { vm.connectViaLan(ip, accessCode, serial) }) {
+                        Text(Bi("Connect LAN", "LAN 連線").inline)
+                    }
+                    Button(onClick = { vm.connectViaRelay(serial) }) {
+                        Text(Bi("Relay", "中繼").inline)
+                    }
+                    OutlinedButton(onClick = { vm.disconnect() }) {
+                        Text(Bi("Disconnect", "中斷").inline)
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { vm.savePrinterManually(name, ip, accessCode, serial) }) {
+                        Text(Bi("Save printer", "儲存打印機").inline)
+                    }
+                    OutlinedButton(onClick = { vm.addRelayPrinter(serial, ip, accessCode, name) }) {
+                        Text(Bi("Add to relay", "加入中繼").inline)
+                    }
+                }
+                AssistChip(onClick = {}, label = {
+                    Text((if (connected) Bi("Connected", "已連線") else Bi("Not connected", "未連線")).inline)
+                })
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BiText(Bi("Relay printers", "中繼打印機"), modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { vm.refreshRelayPrinters() }) {
+                        Text(Bi("Refresh", "重新整理").inline)
+                    }
+                }
+                if (relayPrinters.isEmpty()) {
+                    BiBody(Bi("None yet — add one above, or set the relay URL in Settings.",
+                        "暫時無 — 喺上面加入，或喺設定填中繼網址。"))
+                }
+                relayPrinters.forEach { p ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { serial = p.serial; vm.connectViaRelay(p.serial) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text((p.name.ifBlank { p.serial }) + (if (p.connected) "  ●" else "  ○"))
+                        }
+                        IconButton(onClick = { vm.removeRelayPrinter(p.serial) }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = "Remove  移除")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (connected) {
+            StatusCard(status)
+            status?.ams?.takeIf { it.units.isNotEmpty() }?.let { AmsCard(it) }
+            ControlsCard(vm, status)
+            SendPrintCard(vm)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AmsCard(ams: com.bambuprinterlan.core.model.AmsState) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BiText(Bi("Filament (AMS)", "線材（AMS）"))
+            ams.units.forEach { unit ->
+                if (unit.humidity in 0..100) {
+                    Text(Bi("Humidity", "濕度").inline + ": ${unit.humidity}",
+                        style = MaterialTheme.typography.labelSmall)
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    unit.trays.forEach { tray -> TrayChip(tray) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrayChip(tray: com.bambuprinterlan.core.model.FilamentSlot) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .padding(end = 6.dp)
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(parseTrayColor(tray.colorHex))
+        )
+        Column {
+            Text(tray.type.ifBlank { "—" }, style = MaterialTheme.typography.bodyMedium)
+            val remain = if (tray.remainPercent in 0..100) "${tray.remainPercent}%" else "—"
+            Text(remain, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/** Bambu tray_color is RRGGBBAA hex; use the RGB part. */
+private fun parseTrayColor(hex: String): Color {
+    val clean = hex.removePrefix("#")
+    if (clean.length < 6) return Color.Gray
+    return runCatching {
+        Color(android.graphics.Color.parseColor("#" + clean.substring(0, 6)))
+    }.getOrDefault(Color.Gray)
+}
+
+@Composable
+private fun SendPrintCard(vm: DeviceViewModel) {
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { vm.sendPrint(it) } }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BiText(Bi("Send print", "傳送列印"))
+            BiBody(Bi("Upload a sliced .3mf and start it.", "上載切片好嘅 .3mf 並開始。"))
+            Button(onClick = { picker.launch(arrayOf("application/vnd.ms-3mfdocument", "model/3mf", "*/*")) }) {
+                Text(Bi("Choose .3mf & print", "揀 .3mf 並列印").inline)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusCard(status: DeviceStatus?) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BiText(Bi("Status", "狀態"))
+            val s = status
+            if (s == null) {
+                BiBody(Bi("Waiting for first report…", "等緊第一份狀態回報…"))
+            } else {
+                Text(Bi("State", "狀態").inline + ": ${s.gcodeState}")
+                LinearProgressIndicator(
+                    progress = { s.progressPercent / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(Bi("Progress", "進度").inline + ": ${s.progressPercent}%  ·  " +
+                    Bi("Layer", "層").inline + " ${s.layerNum}/${s.totalLayerNum}")
+                Text(Bi("Remaining", "剩餘").inline + ": ${s.remainingMinutes} " + Bi("min", "分鐘").inline)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Temp(Bi("Nozzle", "噴嘴"), s.nozzleTemper, s.nozzleTargetTemper)
+                    Temp(Bi("Bed", "熱床"), s.bedTemper, s.bedTargetTemper)
+                    Temp(Bi("Chamber", "機艙"), s.chamberTemper, 0f)
+                }
+                if (s.hms.isNotEmpty()) HmsAlerts(s.hms)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HmsAlerts(alerts: List<com.bambuprinterlan.core.model.HmsAlert>) {
+    val uriHandler = LocalUriHandler.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        BiText(Bi("Alerts (${alerts.size})", "警報（${alerts.size}）"))
+        alerts.forEach { a ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${a.severity}  ${a.wikiCode}", style = MaterialTheme.typography.bodyMedium)
+                }
+                OutlinedButton(onClick = { runCatching { uriHandler.openUri(a.wikiUrl) } }) {
+                    Text(Bi("Wiki", "說明").inline)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Temp(label: Bi, current: Float, target: Float) {
+    Column {
+        Text("${current.toInt()}°" + if (target > 0) " / ${target.toInt()}°" else "",
+            style = MaterialTheme.typography.titleMedium)
+        Text(label.inline, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BiText(Bi("Controls", "控制"))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { vm.send(Command.Pause) }) {
+                    Text(Bi("Pause", "暫停").inline)
+                }
+                FilledTonalButton(onClick = { vm.send(Command.Resume) }) {
+                    Text(Bi("Resume", "繼續").inline)
+                }
+                FilledTonalButton(onClick = { vm.send(Command.Stop) }) {
+                    Text(Bi("Stop", "停止").inline)
+                }
+                val lightOn = status?.chamberLightOn ?: false
+                FilledTonalButton(onClick = { vm.send(Command.ChamberLight(!lightOn)) }) {
+                    Text((if (lightOn) Bi("Light off", "關燈") else Bi("Light on", "開燈")).inline)
+                }
+            }
+            Text(Bi("Print speed", "列印速度").inline, style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val speeds = listOf(
+                    SpeedLevel.SILENT to Bi("Silent", "靜音"),
+                    SpeedLevel.STANDARD to Bi("Standard", "標準"),
+                    SpeedLevel.SPORT to Bi("Sport", "運動"),
+                    SpeedLevel.LUDICROUS to Bi("Ludicrous", "瘋狂"),
+                )
+                speeds.forEach { (level, label) ->
+                    val selected = status?.speedLevel == level
+                    FilledTonalButton(onClick = { vm.send(Command.SetSpeed(level)) }) {
+                        Text((if (selected) "● " else "") + label.inline)
+                    }
+                }
+            }
+        }
+    }
+}

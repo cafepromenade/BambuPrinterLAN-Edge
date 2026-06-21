@@ -1,0 +1,28 @@
+# Bambu Printer LAN relay.
+#
+# IMPORTANT (LAN discovery): UDP multicast (SSDP/mDNS) does NOT cross Docker's
+# default bridge network. If you want the relay to auto-discover printers, run
+# it on Linux with `network_mode: host` (uncomment below). Otherwise configure
+# printers explicitly via PRINTER_* / PRINTERS env vars in .env (works anywhere,
+# including Docker Desktop on Windows/macOS where host networking can't do
+# multicast).
+#
+# Never expose port 8979 to the public internet. Reach the relay remotely over
+# Tailscale / WireGuard / a private tunnel only.
+
+services:
+  relay:
+    build: .
+    image: bambuprinterlan-relay:latest
+    restart: unless-stopped
+    env_file:
+      - .env            # holds RELAY_TOKEN + printer IP/access code (gitignored)
+    ports:
+      - "8979:8979"
+    # --- Linux + LAN auto-discovery: prefer host networking and drop `ports` ---
+    # network_mode: host
+    volumes:
+      - relay-data:/data
+
+volumes:
+  relay-data:

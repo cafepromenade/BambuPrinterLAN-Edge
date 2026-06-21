@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bambu Printer LAN</string>
+    <!-- Bilingual: Cantonese + English shown together throughout the app. -->
+    <string name="tagline">Slice. Control. Print — from your phone.\n切片、控制、列印 — 喺你部手機。</string>
+</resources>

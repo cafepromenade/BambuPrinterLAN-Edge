@@ -1,0 +1,53 @@
+# === Secrets (NEVER commit) ===
+local.properties
+*.jks
+*.keystore
+*.p12
+*.env
+.env
+.env.*
+!.env.example
+secrets.properties
+**/google-services.json
+*.token
+
+# === Android / Gradle ===
+.gradle/
+build/
+captures/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.so
+!**/jniLibs/**/.gitkeep
+local.properties
+
+# === IDE ===
+.idea/
+*.iml
+.kotlin/
+.DS_Store
+
+# === Python relay ===
+__pycache__/
+*.pyc
+.venv/
+relay/.pytest_cache/
+
+# === Native build artifacts ===
+engine/native/out/
+engine/native/.cmake/
+*.o
+*.a
+
+# === Misc ===
+*.log
+.claude/
+.builder/
+.artifact-pipeline-work/
+.test_*.png
+.signing/
+.toolchain/
+.batbuild.log

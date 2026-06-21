@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash/launch theme; Compose drives the real UI via BambuPrinterLanTheme. -->
+    <style name="Theme.BambuPrinterLan" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bambu_surface</item>
+        <item name="android:statusBarColor">@color/bambu_surface</item>
+    </style>
+</resources>

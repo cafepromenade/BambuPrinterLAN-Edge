@@ -1,0 +1,22 @@
+Bambu Printer LAN
+========
+
+Bambu Printer LAN is a derivative work and re-implementation that reuses and is based on:
+
+- BambuStudio  — Copyright (C) Bambu Lab — AGPL-3.0
+  https://github.com/bambulab/BambuStudio
+- PrusaSlicer  — Copyright (C) Prusa Research — AGPL-3.0
+  https://github.com/prusa3d/PrusaSlicer
+- Slic3r       — Copyright (C) Alessandro Ranellucci and contributors — AGPL-3.0
+  https://github.com/Slic3r/Slic3r
+
+The C++ slicing engine (libslic3r and bundled libraries) is reused from the
+above projects under the AGPL-3.0 and remains under that license.
+
+The Bambu Lab networking plugin (closed-source) is NOT included or
+redistributed. The networking layer in this project (`:net:bambu` and
+`relay/`) is an independent clean-room re-implementation based on observed
+protocol behavior and public community documentation.
+
+Third-party Android/Kotlin and Python dependencies are listed in
+gradle/libs.versions.toml and relay/requirements.txt with their own licenses.
