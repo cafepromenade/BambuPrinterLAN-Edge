@@ -18,8 +18,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Slider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -32,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -317,37 +321,122 @@ private fun Temp(label: Bi, current: Float, target: Float) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
+    var showStopConfirm by remember { mutableStateOf(false) }
+    var nozzleTarget by remember { mutableStateOf("") }
+    var bedTarget by remember { mutableStateOf("") }
+    var partFan by remember { mutableFloatStateOf((status?.coolingFanSpeed ?: 0).toFloat()) }
+    var step by remember { mutableFloatStateOf(10f) }
+
+    if (showStopConfirm) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirm = false },
+            title = { Text(Bi("Stop print?", "停止列印？").inline) },
+            text = { Text(Bi("This cancels the current print and cannot be undone.",
+                "會取消目前列印，無法復原。").inline) },
+            confirmButton = {
+                TextButton(onClick = { showStopConfirm = false; vm.send(Command.Stop) }) {
+                    Text(Bi("Stop", "停止").inline)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirm = false }) {
+                    Text(Bi("Cancel", "取消").inline)
+                }
+            },
+        )
+    }
+
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BiText(Bi("Controls", "控制"))
+
+            // Print job
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { vm.send(Command.Pause) }) {
-                    Text(Bi("Pause", "暫停").inline)
-                }
-                FilledTonalButton(onClick = { vm.send(Command.Resume) }) {
-                    Text(Bi("Resume", "繼續").inline)
-                }
-                FilledTonalButton(onClick = { vm.send(Command.Stop) }) {
-                    Text(Bi("Stop", "停止").inline)
-                }
+                FilledTonalButton(onClick = { vm.send(Command.Pause) }) { Text(Bi("Pause", "暫停").inline) }
+                FilledTonalButton(onClick = { vm.send(Command.Resume) }) { Text(Bi("Resume", "繼續").inline) }
+                FilledTonalButton(onClick = { showStopConfirm = true }) { Text(Bi("Stop", "停止").inline) }
                 val lightOn = status?.chamberLightOn ?: false
                 FilledTonalButton(onClick = { vm.send(Command.ChamberLight(!lightOn)) }) {
                     Text((if (lightOn) Bi("Light off", "關燈") else Bi("Light on", "開燈")).inline)
                 }
+                FilledTonalButton(onClick = { vm.send(Command.StopBuzzer) }) { Text(Bi("Mute buzzer", "靜音").inline) }
             }
+
+            // Print speed
             Text(Bi("Print speed", "列印速度").inline, style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val speeds = listOf(
+                listOf(
                     SpeedLevel.SILENT to Bi("Silent", "靜音"),
                     SpeedLevel.STANDARD to Bi("Standard", "標準"),
                     SpeedLevel.SPORT to Bi("Sport", "運動"),
                     SpeedLevel.LUDICROUS to Bi("Ludicrous", "瘋狂"),
-                )
-                speeds.forEach { (level, label) ->
-                    val selected = status?.speedLevel == level
+                ).forEach { (level, label) ->
                     FilledTonalButton(onClick = { vm.send(Command.SetSpeed(level)) }) {
-                        Text((if (selected) "● " else "") + label.inline)
+                        Text((if (status?.speedLevel == level) "● " else "") + label.inline)
                     }
+                }
+            }
+
+            // Motion
+            Text(Bi("Move (mm)", "移動（毫米）").inline + ": ${step.toInt()}",
+                style = MaterialTheme.typography.labelLarge)
+            Slider(value = step, onValueChange = { step = it }, valueRange = 1f..50f)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { vm.send(Command.HomeAll) }) { Text(Bi("Home", "歸位").inline) }
+                FilledTonalButton(onClick = { vm.send(Command.Move("X", -step)) }) { Text("X-") }
+                FilledTonalButton(onClick = { vm.send(Command.Move("X", step)) }) { Text("X+") }
+                FilledTonalButton(onClick = { vm.send(Command.Move("Y", -step)) }) { Text("Y-") }
+                FilledTonalButton(onClick = { vm.send(Command.Move("Y", step)) }) { Text("Y+") }
+                FilledTonalButton(onClick = { vm.send(Command.Move("Z", -step)) }) { Text("Z-") }
+                FilledTonalButton(onClick = { vm.send(Command.Move("Z", step)) }) { Text("Z+") }
+                FilledTonalButton(onClick = { vm.send(Command.Extrude(step)) }) { Text(Bi("Extrude", "出料").inline) }
+                FilledTonalButton(onClick = { vm.send(Command.Extrude(-step)) }) { Text(Bi("Retract", "回抽").inline) }
+            }
+
+            // Temperature
+            Text(Bi("Temperature", "溫度").inline, style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(nozzleTarget, { nozzleTarget = it.filter(Char::isDigit) },
+                    label = { Text(Bi("Nozzle °C", "噴嘴 °C").inline) }, singleLine = true,
+                    modifier = Modifier.weight(1f))
+                FilledTonalButton(onClick = { nozzleTarget.toIntOrNull()?.let { vm.send(Command.SetNozzleTemp(it)) } }) {
+                    Text(Bi("Set", "設定").inline)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(bedTarget, { bedTarget = it.filter(Char::isDigit) },
+                    label = { Text(Bi("Bed °C", "熱床 °C").inline) }, singleLine = true,
+                    modifier = Modifier.weight(1f))
+                FilledTonalButton(onClick = { bedTarget.toIntOrNull()?.let { vm.send(Command.SetBedTemp(it)) } }) {
+                    Text(Bi("Set", "設定").inline)
+                }
+            }
+            OutlinedButton(onClick = { vm.send(Command.Cooldown) }) { Text(Bi("Cooldown", "降溫").inline) }
+
+            // Fans
+            Text(Bi("Part fan", "部件風扇").inline + ": ${partFan.toInt()}%",
+                style = MaterialTheme.typography.labelLarge)
+            Slider(value = partFan, onValueChange = { partFan = it },
+                onValueChangeFinished = { vm.send(Command.PartFan(partFan.toInt())) }, valueRange = 0f..100f)
+
+            // Calibration
+            Text(Bi("Calibration", "校準").inline, style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.send(Command.Calibrate(bedLevel = true)) }) { Text(Bi("Bed level", "調平").inline) }
+                OutlinedButton(onClick = { vm.send(Command.Calibrate(vibration = true)) }) { Text(Bi("Vibration", "振動").inline) }
+                OutlinedButton(onClick = { vm.send(Command.Calibrate(motorNoise = true)) }) { Text(Bi("Motor", "馬達").inline) }
+            }
+
+            // AMS
+            if (status?.ams?.units?.isNotEmpty() == true) {
+                Text(Bi("AMS", "AMS").inline, style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (0..3).forEach { tray ->
+                        OutlinedButton(onClick = { vm.send(Command.AmsSelectTray(tray)) }) {
+                            Text(Bi("Tray ${tray + 1}", "料盤 ${tray + 1}").inline)
+                        }
+                    }
+                    OutlinedButton(onClick = { vm.send(Command.AmsControl("resume")) }) { Text(Bi("Resume AMS", "繼續").inline) }
                 }
             }
         }

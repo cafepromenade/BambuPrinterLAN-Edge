@@ -1,58 +1,72 @@
 package com.bambuprinterlan.app.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import com.bambuprinterlan.app.SliceStore
 import com.bambuprinterlan.core.design.Bi
 import com.bambuprinterlan.core.design.BiBody
 import com.bambuprinterlan.core.design.BiText
 
 @Composable
-fun PreviewScreen() {
-    var layer by remember { mutableFloatStateOf(0f) }
+fun PreviewScreen(onOpenDevice: () -> Unit = {}) {
+    val slice by SliceStore.result.collectAsState()
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         BiText(Bi("Preview", "預覽"), enSize = MaterialTheme.typography.headlineSmall.fontSize)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                BiText(Bi("Native engine", "原生引擎"))
-                Text(com.bambuprinterlan.engine.SlicerBridge.version(),
-                    style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                BiText(Bi("G-code viewer", "G-code 檢視器"))
-                BiBody(Bi("Layer playback, time/flow/speed colour modes.",
-                    "逐層播放，時間／流量／速度顏色模式。"))
-            }
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                Text(Bi("Layer", "層").inline + ": ${layer.toInt()}")
-                Slider(value = layer, onValueChange = { layer = it }, valueRange = 0f..100f)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Stat(Bi("Time", "時間"), "—")
-                    Stat(Bi("Filament", "線材"), "—")
-                    Stat(Bi("Layers", "層數"), "100")
+
+        val s = slice
+        if (s == null) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    BiText(Bi("No slice yet", "未有切片"))
+                    BiBody(Bi("Import a model in Prepare and tap Slice.",
+                        "喺準備頁匯入模型，然後撳切片。"))
+                    Text(com.bambuprinterlan.engine.SlicerBridge.version(),
+                        style = MaterialTheme.typography.labelSmall)
                 }
             }
+        } else {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    BiText(Bi("Sliced: ${s.modelName}", "已切片：${s.modelName}"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Stat(Bi("Layers", "層數"), s.layers.toString())
+                        Stat(Bi("G-code", "G-code"), "${s.bytes / 1024} KB")
+                    }
+                }
+            }
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    BiText(Bi("G-code (head)", "G-code（開頭）"))
+                    Text(
+                        s.gcodeHead, style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    )
+                }
+            }
+            Button(onClick = onOpenDevice, modifier = Modifier.fillMaxWidth()) {
+                Text(Bi("Print on device →", "喺裝置列印 →").inline)
+            }
+            BiBody(Bi("Sends you to the Device tab to upload + start the print.",
+                "帶你去裝置頁上載並開始列印。"))
         }
     }
 }

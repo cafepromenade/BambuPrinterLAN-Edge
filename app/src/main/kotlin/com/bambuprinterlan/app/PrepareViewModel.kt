@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -36,6 +37,8 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    private val _sliced = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private val supported = setOf("stl", "obj", "3mf", "step", "stp", "amf")
 
@@ -134,12 +137,18 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             result.onSuccess { (layers, out) ->
-                _message.value = if (layers >= 0)
-                    "Sliced: $layers layers → ${out.name} (${out.length() / 1024} KB)  已切片"
-                else "Slice failed (code $layers)  切片失敗"
+                if (layers >= 0) {
+                    val head = runCatching { out.useLines { it.take(40).joinToString("\n") } }.getOrDefault("")
+                    SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head))
+                    _sliced.tryEmit(Unit)
+                    _message.value = "Sliced: $layers layers → ${out.name} (${out.length() / 1024} KB)  已切片"
+                } else _message.value = "Slice failed (code $layers)  切片失敗"
             }.onFailure { _message.value = "Slice error  切片錯誤: ${it.message ?: ""}" }
         }
     }
+
+    /** Emits when a slice finishes — the screen navigates to Preview. */
+    val sliced = _sliced.asSharedFlow()
 
     fun clearMessage() { _message.value = null }
 }

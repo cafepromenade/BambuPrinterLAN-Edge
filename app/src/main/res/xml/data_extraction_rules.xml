@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: cloud backup + device-to-device transfer of settings + saved
+     printers (DataStore) so a reinstall / new device restores them. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="datastore/" />
+        <include domain="sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="datastore/" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

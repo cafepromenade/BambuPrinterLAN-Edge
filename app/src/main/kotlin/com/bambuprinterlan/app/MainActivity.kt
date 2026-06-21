@@ -45,9 +45,16 @@ import com.bambuprinterlan.app.ui.ToolsScreen
 import com.bambuprinterlan.core.design.BambuPrinterLanTheme
 
 class MainActivity : ComponentActivity() {
+    private val notifPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
         // Startup important-event notification (gated by discord_notify_startup / HA).
         lifecycleScope.launch {
             EventNotifier.fire(
@@ -105,9 +112,14 @@ fun BambuPrinterLanApp() {
             modifier = Modifier.fillMaxSize().padding(inner),
         ) {
             composable(Dest.Prepare.route) {
-                PrepareScreen(onOpenHub = { navController.navigate("filehub") })
+                PrepareScreen(
+                    onOpenHub = { navController.navigate("filehub") },
+                    onOpenPreview = { navController.navigate(Dest.Preview.route) },
+                )
             }
-            composable(Dest.Preview.route) { PreviewScreen() }
+            composable(Dest.Preview.route) {
+                PreviewScreen(onOpenDevice = { navController.navigate(Dest.Device.route) })
+            }
             composable(Dest.Device.route) { DeviceScreen() }
             composable(Dest.Tools.route) {
                 ToolsScreen(

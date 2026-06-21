@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup (Android < 12): back up settings + saved printers (DataStore) so
+     a reinstall restores them. -->
+<full-backup-content>
+    <include domain="file" path="datastore/" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

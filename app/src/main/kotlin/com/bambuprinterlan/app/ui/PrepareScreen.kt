@@ -40,9 +40,14 @@ import com.bambuprinterlan.core.design.BiText
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PrepareScreen(vm: PrepareViewModel = viewModel(), onOpenHub: () -> Unit = {}) {
+fun PrepareScreen(
+    vm: PrepareViewModel = viewModel(),
+    onOpenHub: () -> Unit = {},
+    onOpenPreview: () -> Unit = {},
+) {
     val models by vm.models.collectAsState()
     val message by vm.message.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.sliced.collect { onOpenPreview() } }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()

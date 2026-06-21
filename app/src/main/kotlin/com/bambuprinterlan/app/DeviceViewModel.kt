@@ -66,6 +66,28 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch { repo.savedPrinters().collect { _savedPrinters.value = it } }
+        // Notification action buttons (pause/resume/stop) route to the transport.
+        CommandBus.handler = { cmd -> send(cmd) }
+    }
+
+    /** Drive the ongoing print notification from live status. */
+    private fun updateNotification(st: DeviceStatus) {
+        val app = getApplication<android.app.Application>()
+        when (st.gcodeState) {
+            GcodeState.RUNNING, GcodeState.PAUSE, GcodeState.PREPARE -> {
+                val text = "${st.progressPercent}% · " +
+                    "${app.getString(com.bambuprinterlan.app.R.string.app_name)} · " +
+                    "layer ${st.layerNum}/${st.totalLayerNum} · ${st.remainingMinutes}m"
+                PrintMonitorService.update(
+                    app,
+                    title = st.subtaskName.ifBlank { "Printing  列印中" },
+                    text = text,
+                    progress = st.progressPercent,
+                    paused = st.gcodeState == GcodeState.PAUSE,
+                )
+            }
+            else -> PrintMonitorService.stop(app)
+        }
     }
 
     /** Connect straight to the printer over LAN (TLS MQTT 8883, no cloud/relay). */
@@ -142,6 +164,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                     t.status().collect { st ->
                         _status.value = st
                         maybeNotify(st)
+                        updateNotification(st)
                     }
                 }.onFailure {
                     _message.value = "$label stream error  串流錯誤"
@@ -160,6 +183,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         val t = transport; transport = null
         viewModelScope.launch { runCatching { t?.disconnect() } }
         _connected.value = false
+        PrintMonitorService.stop(getApplication())
     }
 
     fun send(command: Command) {
