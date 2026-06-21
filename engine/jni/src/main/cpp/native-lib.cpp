@@ -169,6 +169,8 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     float density = std::min(100.f, std::max(0.f, cfg(ini, "infill_density", 15)));
     int solidN = std::max(0, (int)cfg(ini, "top_bottom_layers", 3));
     int brim = std::max(0, (int)cfg(ini, "brim_loops", 0));
+    int skirt = std::max(0, (int)cfg(ini, "skirt_loops", 0));
+    float skirtGap = cfg(ini, "skirt_gap", 3.f);
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
     float scale = cfg(ini, "scale", 1.0f); if (scale <= 0) scale = 1.f;
@@ -230,6 +232,21 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
         g << "; layer " << layers << " z=" << z << "\n";
         if (layers == 2) g << "M106 S255\n";
         g << "G1 Z" << z << " F600\n";
+
+        // skirt: priming loops around the whole model on the first layer
+        if (layers == 1 && skirt > 0) {
+            float bx0 = 1e30f, bx1 = -1e30f, by0 = 1e30f, by1 = -1e30f;
+            for (const Loop& lp : loops) for (const Pt& p : lp) {
+                bx0 = std::fmin(bx0, p.x); bx1 = std::fmax(bx1, p.x);
+                by0 = std::fmin(by0, p.y); by1 = std::fmax(by1, p.y);
+            }
+            for (int sk = skirt - 1; sk >= 0; --sk) {
+                float o = skirtGap + sk * lw;
+                Loop rect = {{bx0 - o, by0 - o}, {bx1 + o, by0 - o},
+                             {bx1 + o, by1 + o}, {bx0 - o, by1 + o}};
+                emit_path(rect, true);
+            }
+        }
 
         // brim: outward adhesion loops on the first printed layer
         if (layers == 1 && brim > 0) {

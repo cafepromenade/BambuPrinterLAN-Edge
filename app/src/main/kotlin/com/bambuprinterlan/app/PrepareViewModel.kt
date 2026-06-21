@@ -117,8 +117,8 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
         val model = _models.value.firstOrNull()
         if (model == null) { _message.value = "Import a model first  請先匯入模型"; return }
         val ext = model.name.substringAfterLast('.', "").lowercase()
-        if (ext != "stl" && ext != "obj") {
-            _message.value = "Engine slices STL/OBJ; $ext support is coming  暫支援 STL／OBJ"
+        if (ext != "stl" && ext != "obj" && ext != "3mf") {
+            _message.value = "Engine slices STL/OBJ/3MF; $ext support is coming  暫支援 STL／OBJ／3MF"
             return
         }
         viewModelScope.launch {
@@ -126,13 +126,19 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val ctx = getApplication<Application>()
-                    val input = File(ctx.cacheDir, "input.stl")
+                    val input = File(ctx.cacheDir, "input.$ext")
                     ctx.contentResolver.openInputStream(Uri.parse(model.uri))?.use { src ->
                         input.outputStream().use { src.copyTo(it) }
                     } ?: error("Could not read model")
+                    // 3MF: unzip + parse mesh -> binary STL the engine slices.
+                    val meshFile = if (ext == "3mf") {
+                        val stl = File(ctx.cacheDir, "input3mf.stl")
+                        if (!Mesh3mf.toStl(input.inputStream(), stl)) error("Could not parse 3MF")
+                        stl
+                    } else input
                     val out = File(ctx.cacheDir, "output.gcode")
                     val layers = com.bambuprinterlan.engine.SlicerBridge.slice(
-                        input.absolutePath, out.absolutePath, ModelEditStore.configIni(),
+                        meshFile.absolutePath, out.absolutePath, ModelEditStore.configIni(),
                     )
                     Pair(layers, out)
                 }
