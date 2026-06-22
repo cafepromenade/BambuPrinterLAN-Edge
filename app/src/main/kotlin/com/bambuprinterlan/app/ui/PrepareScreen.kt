@@ -75,7 +75,7 @@ fun PrepareScreen(
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     BiText(Bi("Import model", "匯入模型"))
-                    BiBody(Bi("STL · OBJ · 3MF · STEP · AMF", "STL · OBJ · 3MF · STEP · AMF"))
+                    BiBody(Bi("STL · OBJ · 3MF · G-code", "STL · OBJ · 3MF · G-code"))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             picker.launch(arrayOf(

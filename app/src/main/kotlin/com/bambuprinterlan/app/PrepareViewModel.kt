@@ -40,7 +40,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _sliced = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
-    private val supported = setOf("stl", "obj", "3mf", "step", "stp", "amf")
+    private val supported = setOf("stl", "obj", "3mf", "step", "stp", "amf", "gcode")
 
     init {
         // Restore the auto-saved workspace.
@@ -127,6 +127,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
         val model = _models.value.firstOrNull()
         if (model == null) { _message.value = "Import a model first  請先匯入模型"; return }
         val ext = model.name.substringAfterLast('.', "").lowercase()
+        if (ext == "gcode") { loadGcode(model); return }
         if (ext != "stl" && ext != "obj" && ext != "3mf") {
             _message.value = "Engine slices STL/OBJ/3MF; $ext support is coming  暫支援 STL／OBJ／3MF"
             return
@@ -164,6 +165,39 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             }.onFailure {
                 _message.value = "Couldn't prepare this model. Try another file.  無法處理此模型，請換另一個檔案。"
             }
+        }
+    }
+
+    /** Load an existing .gcode directly (no slicing) and jump to Preview. */
+    private fun loadGcode(model: ImportedModel) {
+        viewModelScope.launch {
+            _message.value = "Loading ${model.name}…  載入緊…"
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val ctx = getApplication<Application>()
+                    val out = File(ctx.cacheDir, "output.gcode")
+                    ctx.contentResolver.openInputStream(Uri.parse(model.uri))?.use { src ->
+                        out.outputStream().use { src.copyTo(it) }
+                    } ?: error("Could not read file")
+                    // Count layers: explicit markers, else distinct Z moves.
+                    var markers = 0; var zMoves = 0
+                    out.useLines { lines ->
+                        lines.forEach { ln ->
+                            val t = ln.trimStart()
+                            if (t.startsWith(";LAYER") || t.startsWith("; layer")) markers++
+                            else if (t.startsWith("G1 Z") || t.startsWith("G0 Z")) zMoves++
+                        }
+                    }
+                    val layers = if (markers > 0) markers else zMoves
+                    val head = runCatching { out.useLines { it.take(40).joinToString("\n") } }.getOrDefault("")
+                    Triple(layers, out, head)
+                }
+            }
+            result.onSuccess { (layers, out, head) ->
+                SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head))
+                _sliced.tryEmit(Unit)
+                _message.value = "Loaded G-code: $layers layers  已載入 G-code"
+            }.onFailure { _message.value = "Couldn't read this G-code.  無法讀取此 G-code。" }
         }
     }
 
