@@ -16,6 +16,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -96,6 +98,33 @@ fun CalibrationScreen(onBack: () -> Unit = {}) {
                     Button(onClick = { attempt(a) }, modifier = Modifier.fillMaxWidth()) {
                         Text(Bi("Run", "執行").inline)
                     }
+                }
+            }
+        }
+
+        // Live tuning (safe to change mid-print): Pressure Advance + Flow rate.
+        var paK by remember { mutableStateOf("0.02") }
+        var flowPct by remember { mutableStateOf("100") }
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                BiText(Bi("Live tuning", "即時微調"))
+                BiBody(Bi("Adjust while printing — no need to stop.", "可邊打邊調，唔使停。"))
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(paK, { paK = it }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text(Bi("Pressure Advance K", "壓力前進 K").inline) })
+                    OutlinedButton(onClick = {
+                        paK.toFloatOrNull()?.let { CommandBus.send(Command.GcodeLine("M900 K$it\n")) }
+                    }) { Text(Bi("Apply", "套用").inline) }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(flowPct, { flowPct = it.filter(Char::isDigit) },
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text(Bi("Flow rate %", "流量 %").inline) })
+                    OutlinedButton(onClick = {
+                        flowPct.toIntOrNull()?.let { CommandBus.send(Command.GcodeLine("M221 S$it\n")) }
+                    }) { Text(Bi("Apply", "套用").inline) }
                 }
             }
         }
