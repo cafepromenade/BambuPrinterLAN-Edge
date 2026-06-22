@@ -18,6 +18,7 @@ data class EditState(
     val walls: Int = 2,
     val brim: Int = 0,
     val skirt: Int = 0,
+    val infillPattern: Int = 0,   // 0 line, 1 grid, 2 triangles, 3 star, 4 concentric
     val flowRatio: Float = 1.0f,
     val nozzleTemp: Int = 220,
     val bedTemp: Int = 60,
@@ -50,6 +51,7 @@ object ModelEditStore {
                 walls = p.getInt("walls", 2),
                 brim = p.getInt("brim", 0),
                 skirt = p.getInt("skirt", 0),
+                infillPattern = p.getInt("infillPattern", 0),
                 flowRatio = p.getFloat("flowRatio", 1f),
                 nozzleTemp = p.getInt("nozzleTemp", 220),
                 bedTemp = p.getInt("bedTemp", 60),
@@ -64,7 +66,8 @@ object ModelEditStore {
             putFloat("scale", s.scale); putFloat("rotateZ", s.rotateZ)
             putFloat("moveX", s.moveX); putFloat("moveY", s.moveY); putBoolean("center", s.center)
             putFloat("layerHeight", s.layerHeight); putInt("infill", s.infill); putInt("walls", s.walls)
-            putInt("brim", s.brim); putInt("skirt", s.skirt); putFloat("flowRatio", s.flowRatio)
+            putInt("brim", s.brim); putInt("skirt", s.skirt); putInt("infillPattern", s.infillPattern)
+            putFloat("flowRatio", s.flowRatio)
             putInt("nozzleTemp", s.nozzleTemp); putInt("bedTemp", s.bedTemp)
             apply()
         }
@@ -80,6 +83,7 @@ object ModelEditStore {
             append("center = ").append(if (center) 1 else 0).append('\n')
             append("layer_height = ").append(layerHeight).append('\n')
             append("infill_density = ").append(infill).append('\n')
+            append("infill_pattern = ").append(infillPattern).append('\n')
             append("wall_loops = ").append(walls).append('\n')
             append("brim_loops = ").append(brim).append('\n')
             append("skirt_loops = ").append(skirt).append('\n')

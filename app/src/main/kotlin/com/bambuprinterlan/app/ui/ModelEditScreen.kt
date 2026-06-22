@@ -4,11 +4,14 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.produceState
@@ -43,6 +46,7 @@ import com.bambuprinterlan.core.design.BiText
  * Model Edit Lab — transform (scale/rotate/move/center) and slice settings
  * (layer height, infill, walls, temps) fed to the native slicer. Bilingual.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ModelEditScreen(onBack: () -> Unit = {}) {
     val s by ModelEditStore.state.collectAsState()
@@ -115,6 +119,20 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                     "內部實心程度。15% 適合大多數；越高越堅固越重。"))
                 Slider(s.infill.toFloat(), { v -> ModelEditStore.update { it.copy(infill = v.toInt()) } },
                     valueRange = 0f..100f)
+                Labeled(Bi("Infill pattern", "填充圖案"), "")
+                Hint(Bi("Shape of the inside fill. Grid/Triangles are stronger.",
+                    "內部填充嘅形狀。網格／三角形更堅固。"))
+                val patterns = listOf(
+                    Bi("Lines", "線條"), Bi("Grid", "網格"), Bi("Triangles", "三角"),
+                    Bi("Star", "星形"), Bi("Concentric", "同心"),
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    patterns.forEachIndexed { i, p ->
+                        FilterChip(selected = s.infillPattern == i,
+                            onClick = { ModelEditStore.update { it.copy(infillPattern = i) } },
+                            label = { Text(p.inline) })
+                    }
+                }
                 Labeled(Bi("Walls", "牆數"), "${s.walls}")
                 Hint(Bi("Number of outer shells. 2–3 is typical.", "外殼層數。一般 2–3 層。"))
                 Slider(s.walls.toFloat(), { v -> ModelEditStore.update { it.copy(walls = v.toInt().coerceIn(1, 5)) } },

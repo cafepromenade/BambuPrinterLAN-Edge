@@ -170,6 +170,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int solidN = std::max(0, (int)cfg(ini, "top_bottom_layers", 3));
     int brim = std::max(0, (int)cfg(ini, "brim_loops", 0));
     int skirt = std::max(0, (int)cfg(ini, "skirt_loops", 0));
+    int pattern = (int)cfg(ini, "infill_pattern", 0);  // 0 line,1 grid,2 tri,3 star,4 concentric
     float skirtGap = cfg(ini, "skirt_gap", 3.f);
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
@@ -286,37 +287,75 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
             }
         }
 
-        // infill: even-odd scanline; solid on top/bottom layers
+        // infill: even-odd scanline at an arbitrary angle; solid on top/bottom.
         bool solid = (li < solidN) || (z > height - solidN * lh);
         float dens = solid ? 100.f : density;
         if (dens > 0.5f) {
-            float spacing = lw / (dens / 100.f);
-            bool vertical = (li % 2) == 1;
-            float a0 = 1e30f, a1 = -1e30f;
-            for (const Loop& lp : loops) for (const Pt& p : lp) {
-                float c = vertical ? p.x : p.y; a0 = std::fmin(a0, c); a1 = std::fmax(a1, c);
-            }
-            for (float a = a0 + spacing * 0.5f; a < a1; a += spacing) {
-                std::vector<float> xs;
-                for (const Loop& lp : loops) {
-                    size_t m = lp.size();
-                    for (size_t i = 0; i < m; ++i) {
-                        const Pt& p1 = lp[i]; const Pt& p2 = lp[(i + 1) % m];
-                        float c1 = vertical ? p1.x : p1.y, c2 = vertical ? p2.x : p2.y;
-                        if ((c1 <= a && c2 > a) || (c2 <= a && c1 > a)) {
-                            float u = (a - c1) / (c2 - c1);
-                            float b1 = vertical ? p1.y : p1.x, b2 = vertical ? p2.y : p2.x;
-                            xs.push_back(b1 + u * (b2 - b1));
-                        }
+            float base = lw / (dens / 100.f);
+            // emit straight infill lines at angleDeg with given spacing (clipped to loops)
+            auto infill_angle = [&](float angleDeg, float spacing) {
+                float ar = angleDeg * 3.14159265f / 180.f;
+                float c = std::cos(-ar), s = std::sin(-ar);   // rotate into scan frame
+                float cb = std::cos(ar), sb = std::sin(ar);   // rotate back to world
+                std::vector<Loop> rl(loops.size());
+                float y0 = 1e30f, y1 = -1e30f;
+                for (size_t k = 0; k < loops.size(); ++k) {
+                    rl[k].reserve(loops[k].size());
+                    for (const Pt& p : loops[k]) {
+                        float rx = p.x * c + p.y * s, ry = -p.x * s + p.y * c;
+                        rl[k].push_back({rx, ry});
+                        y0 = std::fmin(y0, ry); y1 = std::fmax(y1, ry);
                     }
                 }
-                std::sort(xs.begin(), xs.end());
-                for (size_t i = 0; i + 1 < xs.size(); i += 2) {
-                    Pt A = vertical ? Pt{a, xs[i]} : Pt{xs[i], a};
-                    Pt B = vertical ? Pt{a, xs[i + 1]} : Pt{xs[i + 1], a};
-                    std::vector<Pt> line = {A, B};
-                    emit_path(line, false);
+                for (float yv = y0 + spacing * 0.5f; yv < y1; yv += spacing) {
+                    std::vector<float> xs;
+                    for (const Loop& lp : rl) {
+                        size_t m = lp.size();
+                        for (size_t i = 0; i < m; ++i) {
+                            const Pt& p1 = lp[i]; const Pt& p2 = lp[(i + 1) % m];
+                            if ((p1.y <= yv && p2.y > yv) || (p2.y <= yv && p1.y > yv)) {
+                                float u = (yv - p1.y) / (p2.y - p1.y);
+                                xs.push_back(p1.x + u * (p2.x - p1.x));
+                            }
+                        }
+                    }
+                    std::sort(xs.begin(), xs.end());
+                    for (size_t i = 0; i + 1 < xs.size(); i += 2) {
+                        Pt A{xs[i] * cb - yv * sb, xs[i] * sb + yv * cb};
+                        Pt B{xs[i + 1] * cb - yv * sb, xs[i + 1] * sb + yv * cb};
+                        std::vector<Pt> line = {A, B}; emit_path(line, false);
+                    }
                 }
+            };
+            if (solid) {
+                infill_angle((li % 2) ? 135.f : 45.f, base);   // solid top/bottom
+            } else switch (pattern) {
+                case 1:  // grid
+                    infill_angle(0.f, base * 2); infill_angle(90.f, base * 2); break;
+                case 2:  // triangles
+                    infill_angle(0.f, base * 3); infill_angle(60.f, base * 3); infill_angle(120.f, base * 3); break;
+                case 3:  // star / cubic-ish
+                    infill_angle(0.f, base * 4); infill_angle(45.f, base * 4);
+                    infill_angle(90.f, base * 4); infill_angle(135.f, base * 4); break;
+                case 4: {  // concentric: inward contour offsets
+                    for (const Loop& lp : loops) {
+                        if (lp.size() < 3) continue;
+                        float gx = 0, gy = 0; for (const Pt& p : lp) { gx += p.x; gy += p.y; }
+                        gx /= lp.size(); gy /= lp.size();
+                        for (int r = walls; r < 40; ++r) {
+                            float off = r * base; Loop ring; ring.reserve(lp.size()); bool ok = false;
+                            for (const Pt& p : lp) {
+                                float dx = p.x - gx, dy = p.y - gy; float dl = std::sqrt(dx*dx+dy*dy);
+                                float kk = dl > off ? (dl - off) / dl : 0.f; if (kk > 0) ok = true;
+                                ring.push_back({gx + dx * kk, gy + dy * kk});
+                            }
+                            if (!ok) break; emit_path(ring, true);
+                        }
+                    }
+                    break;
+                }
+                default:  // 0 = line, alternating per layer
+                    infill_angle((li % 2) ? 90.f : 0.f, base); break;
             }
         }
     }
