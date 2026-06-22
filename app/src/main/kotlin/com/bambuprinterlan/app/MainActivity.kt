@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 import com.bambuprinterlan.app.ui.CommandBar
 import com.bambuprinterlan.app.ui.FidgetLabScreen
 import com.bambuprinterlan.app.ui.HahaGate
+import com.bambuprinterlan.app.ui.Onboarding
+import com.bambuprinterlan.app.ui.OnboardingScreen
 import com.bambuprinterlan.app.ui.StartupIntro
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -69,11 +71,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             BambuPrinterLanTheme {
                 var introDone by rememberSaveable { mutableStateOf(false) }
+                var showOnboarding by rememberSaveable {
+                    mutableStateOf(Onboarding.shouldShow(applicationContext))
+                }
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize()) {
                         BambuPrinterLanApp()
                         HahaGate()
                         if (!introDone) StartupIntro(onDone = { introDone = true })
+                        if (showOnboarding) OnboardingScreen(onDone = {
+                            Onboarding.markSeen(applicationContext)
+                            showOnboarding = false
+                        })
                     }
                 }
             }
