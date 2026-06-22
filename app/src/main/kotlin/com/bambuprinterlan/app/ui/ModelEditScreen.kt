@@ -150,6 +150,15 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
+                        Text(Bi("Supports", "支撐").inline,
+                            style = MaterialTheme.typography.labelLarge)
+                        Hint(Bi("Auto-generate props under overhangs so they don't sag.",
+                            "喺懸空位自動加支撐，避免下垂。"))
+                    }
+                    Switch(s.support, { v -> ModelEditStore.update { it.copy(support = v) } })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
                         Text(Bi("Ironing (smooth top)", "熨平（平滑頂面）").inline,
                             style = MaterialTheme.typography.labelLarge)
                         Hint(Bi("Extra fine pass over the top for a smoother finish.",

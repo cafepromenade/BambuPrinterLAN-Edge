@@ -175,6 +175,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int wallOrder = (int)cfg(ini, "wall_order", 0);    // 0 outer-first, 1 inner-first
     int iron = (int)cfg(ini, "ironing", 0);            // smooth the top surface
     float ironFlow = cfg(ini, "iron_flow", 0.15f);
+    int support = (int)cfg(ini, "support", 0);         // generate overhang supports
     float skirtGap = cfg(ini, "skirt_gap", 3.f);
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
@@ -227,6 +228,52 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
             g << "G1 X" << b.x << " Y" << b.y << " E" << (d * e_mm * flowMul) << " F1500\n";
         }
     };
+
+    // ---- support pre-pass: coarse occupancy grid -> overhang columns --------
+    std::vector<std::vector<char>> supportG;
+    float gMinX = 0, gMinY = 0; int gnx = 0, gny = 0; const float cs = 3.0f;
+    if (support) {
+        float ax0 = 1e30f, ax1 = -1e30f, ay0 = 1e30f, ay1 = -1e30f;
+        for (const Tri& t : tris) for (int k = 0; k < 3; ++k) {
+            ax0 = std::fmin(ax0, t.v[k].x); ax1 = std::fmax(ax1, t.v[k].x);
+            ay0 = std::fmin(ay0, t.v[k].y); ay1 = std::fmax(ay1, t.v[k].y);
+        }
+        gMinX = ax0; gMinY = ay0;
+        gnx = std::max(1, (int)std::ceil((ax1 - ax0) / cs));
+        gny = std::max(1, (int)std::ceil((ay1 - ay0) / cs));
+        if ((long)gnx * gny > 200000) support = 0;  // too large, skip supports
+    }
+    if (support) {
+        std::vector<std::vector<char>> insideG;
+        for (float z = lh * 0.5f; z <= height; z += lh) {
+            std::vector<Seg> segs; Seg s;
+            for (const Tri& t : tris) if (tri_seg(t, z, s)) segs.push_back(s);
+            std::vector<Loop> loops = segs.empty() ? std::vector<Loop>() : chain(segs);
+            std::vector<char> grid((size_t)gnx * gny, 0);
+            for (int iy = 0; iy < gny; ++iy) for (int ix = 0; ix < gnx; ++ix) {
+                float px = gMinX + (ix + 0.5f) * cs, py = gMinY + (iy + 0.5f) * cs;
+                bool in = false;
+                for (const Loop& lp : loops) {
+                    size_t m = lp.size();
+                    for (size_t i = 0, j = m - 1; i < m; j = i++) {
+                        if (((lp[i].y > py) != (lp[j].y > py)) &&
+                            (px < (lp[j].x - lp[i].x) * (py - lp[i].y) / (lp[j].y - lp[i].y) + lp[i].x))
+                            in = !in;
+                    }
+                }
+                grid[(size_t)iy * gnx + ix] = in ? 1 : 0;
+            }
+            insideG.push_back(std::move(grid));
+        }
+        int NL = (int)insideG.size();
+        supportG.assign(NL, std::vector<char>((size_t)gnx * gny, 0));
+        for (int k = NL - 2; k >= 0; --k) {
+            for (size_t c = 0; c < (size_t)gnx * gny; ++c) {
+                bool aboveSolid = insideG[k + 1][c] || supportG[k + 1][c];
+                supportG[k][c] = (!insideG[k][c] && aboveSolid) ? 1 : 0;
+            }
+        }
+    }
 
     int approxLayers = (int)(height / lh);
     int layers = 0;
@@ -378,6 +425,19 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
                 flowMul = ironFlow;
                 infill_angle(45.f, lw * 0.3f);
                 flowMul = 1.f;
+            }
+        }
+
+        // supports: sparse lines under detected overhangs
+        if (support && li < (int)supportG.size()) {
+            const std::vector<char>& sg = supportG[li];
+            bool wrote = false;
+            for (int iy = 0; iy < gny; ++iy) for (int ix = 0; ix < gnx; ++ix) {
+                if (!sg[(size_t)iy * gnx + ix]) continue;
+                if (!wrote) { g << "; support\n"; wrote = true; }
+                float cx2 = gMinX + (ix + 0.5f) * cs, cy2 = gMinY + (iy + 0.5f) * cs;
+                std::vector<Pt> line = {{cx2 - cs * 0.4f, cy2}, {cx2 + cs * 0.4f, cy2}};
+                emit_path(line, false);
             }
         }
     }

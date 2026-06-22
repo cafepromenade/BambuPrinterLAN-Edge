@@ -22,6 +22,7 @@ data class EditState(
     val seam: Int = 0,            // 0 nearest, 1 back, 2 front
     val innerWallsFirst: Boolean = false,
     val ironing: Boolean = false,
+    val support: Boolean = false,
     val flowRatio: Float = 1.0f,
     val nozzleTemp: Int = 220,
     val bedTemp: Int = 60,
@@ -58,6 +59,7 @@ object ModelEditStore {
                 seam = p.getInt("seam", 0),
                 innerWallsFirst = p.getBoolean("innerWallsFirst", false),
                 ironing = p.getBoolean("ironing", false),
+                support = p.getBoolean("support", false),
                 flowRatio = p.getFloat("flowRatio", 1f),
                 nozzleTemp = p.getInt("nozzleTemp", 220),
                 bedTemp = p.getInt("bedTemp", 60),
@@ -74,7 +76,8 @@ object ModelEditStore {
             putFloat("layerHeight", s.layerHeight); putInt("infill", s.infill); putInt("walls", s.walls)
             putInt("brim", s.brim); putInt("skirt", s.skirt); putInt("infillPattern", s.infillPattern)
             putInt("seam", s.seam); putBoolean("innerWallsFirst", s.innerWallsFirst)
-            putBoolean("ironing", s.ironing); putFloat("flowRatio", s.flowRatio)
+            putBoolean("ironing", s.ironing); putBoolean("support", s.support)
+            putFloat("flowRatio", s.flowRatio)
             putInt("nozzleTemp", s.nozzleTemp); putInt("bedTemp", s.bedTemp)
             apply()
         }
@@ -94,6 +97,7 @@ object ModelEditStore {
             append("seam_position = ").append(seam).append('\n')
             append("wall_order = ").append(if (innerWallsFirst) 1 else 0).append('\n')
             append("ironing = ").append(if (ironing) 1 else 0).append('\n')
+            append("support = ").append(if (support) 1 else 0).append('\n')
             append("wall_loops = ").append(walls).append('\n')
             append("brim_loops = ").append(brim).append('\n')
             append("skirt_loops = ").append(skirt).append('\n')
