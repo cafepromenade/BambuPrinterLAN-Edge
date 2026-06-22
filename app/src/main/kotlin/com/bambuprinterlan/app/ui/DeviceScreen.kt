@@ -333,6 +333,7 @@ private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
     var partFan by remember { mutableFloatStateOf((status?.coolingFanSpeed ?: 0).toFloat()) }
     var auxFan by remember { mutableFloatStateOf(0f) }
     var chamberFan by remember { mutableFloatStateOf(0f) }
+    var recording by remember { mutableStateOf(false) }
     var step by remember { mutableFloatStateOf(10f) }
 
     if (showStopConfirm) {
@@ -434,6 +435,15 @@ private fun ControlsCard(vm: DeviceViewModel, status: DeviceStatus?) {
                 style = MaterialTheme.typography.labelLarge)
             Slider(value = chamberFan, onValueChange = { chamberFan = it },
                 onValueChangeFinished = { vm.send(Command.ChamberFan(chamberFan.toInt())) }, valueRange = 0f..100f)
+
+            // Camera / timelapse
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(Bi("Timelapse recording", "縮時錄影").inline,
+                    style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                androidx.compose.material3.Switch(checked = recording, onCheckedChange = {
+                    recording = it; vm.send(Command.Record(it))
+                })
+            }
 
             // Calibration
             Text(Bi("Calibration", "校準").inline, style = MaterialTheme.typography.labelLarge)
