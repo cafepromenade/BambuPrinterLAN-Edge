@@ -210,6 +210,9 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     float height = maxz - minz;
 
     float flow = cfg(ini, "flow_ratio", 1.0f); if (flow <= 0.f) flow = 1.f;
+    float retract = cfg(ini, "retract_length", 0.8f); if (retract < 0.f) retract = 0.f;
+    float zhop = cfg(ini, "z_hop", 0.f); if (zhop < 0.f) zhop = 0.f;
+    float curZ = 0.f;
 
     std::ofstream g(out);
     if (!g) return -3;
@@ -224,9 +227,11 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     float flowMul = 1.f;  // scaled down during the ironing pass
     auto emit_path = [&](const std::vector<Pt>& pts, bool close) {
         if (pts.size() < 2) return;
-        g << "G1 E-0.8 F1800\n";
+        if (retract > 0.f) g << "G1 E-" << retract << " F1800\n";
+        if (zhop > 0.f) g << "G1 Z" << (curZ + zhop) << " F600\n";
         g << "G0 X" << pts[0].x << " Y" << pts[0].y << " F6000\n";
-        g << "G1 E0.8 F1800\n";
+        if (zhop > 0.f) g << "G1 Z" << curZ << " F600\n";
+        if (retract > 0.f) g << "G1 E" << retract << " F1800\n";
         size_t cnt = pts.size() + (close ? 1 : 0);
         for (size_t i = 1; i < cnt; ++i) {
             const Pt& a = pts[(i - 1) % pts.size()]; const Pt& b = pts[i % pts.size()];
@@ -298,6 +303,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
         ++layers;
         g << "; layer " << layers << " z=" << z << "\n";
         if (layers == 2) g << "M106 S255\n";
+        curZ = z;
         g << "G1 Z" << z << " F600\n";
 
         // skirt: priming loops around the whole model on the first layer

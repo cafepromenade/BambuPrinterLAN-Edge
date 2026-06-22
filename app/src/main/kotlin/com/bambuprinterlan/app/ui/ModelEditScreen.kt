@@ -228,6 +228,16 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                     "微調出料份量。除非校正，否則保持 100%。"))
                 Slider(s.flowRatio, { v -> ModelEditStore.update { it.copy(flowRatio = (Math.round(v * 100) / 100f)) } },
                     valueRange = 0.9f..1.1f)
+                Labeled(Bi("Retraction", "回抽"), "%.1f mm".format(s.retractLength))
+                Hint(Bi("Pulls filament back on travels to reduce stringing.",
+                    "移動時回抽線材，減少拉絲。"))
+                Slider(s.retractLength, { v -> ModelEditStore.update { it.copy(retractLength = (Math.round(v * 10) / 10f)) } },
+                    valueRange = 0f..3f)
+                Labeled(Bi("Z-hop", "Z 抬升"), "%.1f mm".format(s.zHop))
+                Hint(Bi("Lifts the nozzle on travels to avoid hitting the print.",
+                    "移動時抬起噴嘴，避免撞到模型。"))
+                Slider(s.zHop, { v -> ModelEditStore.update { it.copy(zHop = (Math.round(v * 10) / 10f)) } },
+                    valueRange = 0f..1f)
                 Labeled(Bi("Nozzle °C", "噴嘴 °C"), "${s.nozzleTemp}")
                 Slider(s.nozzleTemp.toFloat(), { v -> ModelEditStore.update { it.copy(nozzleTemp = v.toInt()) } },
                     valueRange = 170f..300f)

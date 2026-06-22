@@ -26,6 +26,8 @@ data class EditState(
     val ironing: Boolean = false,
     val supportMode: Int = 0,    // 0 off, 1 everywhere, 2 plate-only
     val flowRatio: Float = 1.0f,
+    val retractLength: Float = 0.8f,
+    val zHop: Float = 0f,
     val nozzleTemp: Int = 220,
     val bedTemp: Int = 60,
 )
@@ -65,6 +67,8 @@ object ModelEditStore {
                 ironing = p.getBoolean("ironing", false),
                 supportMode = p.getInt("supportMode", 0),
                 flowRatio = p.getFloat("flowRatio", 1f),
+                retractLength = p.getFloat("retractLength", 0.8f),
+                zHop = p.getFloat("zHop", 0f),
                 nozzleTemp = p.getInt("nozzleTemp", 220),
                 bedTemp = p.getInt("bedTemp", 60),
             )
@@ -83,6 +87,7 @@ object ModelEditStore {
             putInt("seam", s.seam); putBoolean("innerWallsFirst", s.innerWallsFirst)
             putBoolean("ironing", s.ironing); putInt("supportMode", s.supportMode)
             putFloat("flowRatio", s.flowRatio)
+            putFloat("retractLength", s.retractLength); putFloat("zHop", s.zHop)
             putInt("nozzleTemp", s.nozzleTemp); putInt("bedTemp", s.bedTemp)
             apply()
         }
@@ -109,6 +114,8 @@ object ModelEditStore {
             append("brim_loops = ").append(brim).append('\n')
             append("skirt_loops = ").append(skirt).append('\n')
             append("flow_ratio = ").append(flowRatio).append('\n')
+            append("retract_length = ").append(retractLength).append('\n')
+            append("z_hop = ").append(zHop).append('\n')
             append("nozzle_temp = ").append(nozzleTemp).append('\n')
             append("bed_temp = ").append(bedTemp).append('\n')
         }
