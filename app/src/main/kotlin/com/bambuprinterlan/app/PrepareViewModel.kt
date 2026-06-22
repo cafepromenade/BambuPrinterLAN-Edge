@@ -159,8 +159,11 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
                     SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head))
                     _sliced.tryEmit(Unit)
                     _message.value = "Sliced: $layers layers → ${out.name} (${out.length() / 1024} KB)  已切片"
-                } else _message.value = "Slice failed (code $layers)  切片失敗"
-            }.onFailure { _message.value = "Slice error  切片錯誤: ${it.message ?: ""}" }
+                } else _message.value =
+                    "Couldn't prepare this model. Try another STL/OBJ/3MF file.  無法處理此模型，請換另一個檔案。"
+            }.onFailure {
+                _message.value = "Couldn't prepare this model. Try another file.  無法處理此模型，請換另一個檔案。"
+            }
         }
     }
 

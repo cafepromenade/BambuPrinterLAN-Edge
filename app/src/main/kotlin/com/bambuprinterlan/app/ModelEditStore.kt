@@ -1,5 +1,7 @@
 package com.bambuprinterlan.app
 
+import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,11 +23,52 @@ data class EditState(
     val bedTemp: Int = 60,
 )
 
+/**
+ * Holds the slice/transform settings. Persisted to SharedPreferences (covered by
+ * Auto Backup) so tuned values survive app restarts and reinstalls.
+ */
 object ModelEditStore {
     private val _state = MutableStateFlow(EditState())
     val state: StateFlow<EditState> = _state.asStateFlow()
 
-    fun update(transform: (EditState) -> EditState) { _state.value = transform(_state.value) }
+    private var prefs: SharedPreferences? = null
+
+    /** Call once at startup to load persisted settings. */
+    fun init(context: Context) {
+        if (prefs != null) return
+        val p = context.applicationContext.getSharedPreferences("slice_settings", Context.MODE_PRIVATE)
+        prefs = p
+        if (p.contains("layerHeight")) {
+            _state.value = EditState(
+                scale = p.getFloat("scale", 1f),
+                rotateZ = p.getFloat("rotateZ", 0f),
+                moveX = p.getFloat("moveX", 0f),
+                moveY = p.getFloat("moveY", 0f),
+                center = p.getBoolean("center", true),
+                layerHeight = p.getFloat("layerHeight", 0.2f),
+                infill = p.getInt("infill", 15),
+                walls = p.getInt("walls", 2),
+                brim = p.getInt("brim", 0),
+                skirt = p.getInt("skirt", 0),
+                flowRatio = p.getFloat("flowRatio", 1f),
+                nozzleTemp = p.getInt("nozzleTemp", 220),
+                bedTemp = p.getInt("bedTemp", 60),
+            )
+        }
+    }
+
+    fun update(transform: (EditState) -> EditState) {
+        val s = transform(_state.value)
+        _state.value = s
+        prefs?.edit()?.apply {
+            putFloat("scale", s.scale); putFloat("rotateZ", s.rotateZ)
+            putFloat("moveX", s.moveX); putFloat("moveY", s.moveY); putBoolean("center", s.center)
+            putFloat("layerHeight", s.layerHeight); putInt("infill", s.infill); putInt("walls", s.walls)
+            putInt("brim", s.brim); putInt("skirt", s.skirt); putFloat("flowRatio", s.flowRatio)
+            putInt("nozzleTemp", s.nozzleTemp); putInt("bedTemp", s.bedTemp)
+            apply()
+        }
+    }
 
     /** Build the `key = value` config the native engine reads. */
     fun configIni(): String = with(_state.value) {

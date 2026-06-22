@@ -105,8 +105,8 @@ fun DeviceScreen(vm: DeviceViewModel = viewModel()) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BiText(Bi("Connect", "連線"))
-                BiBody(Bi("LAN-direct (IP + access code) or via the relay (set in Settings).",
-                    "LAN 直連（IP + 存取碼）或經中繼（喺設定填）。"))
+                BiBody(Bi("Easiest: scan the QR on your printer to fill everything, then tap Connect.",
+                    "最簡單：掃描打印機上嘅 QR 自動填寫，再撳連線。"))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         com.bambuprinterlan.app.scanQrCode(context, onResult = {
@@ -117,6 +117,8 @@ fun DeviceScreen(vm: DeviceViewModel = viewModel()) {
                         }, onError = { /* surfaced by scanner UI */ })
                     }) { Text(Bi("Scan QR", "掃描 QR").inline) }
                 }
+                BiBody(Bi("Tip: on the printer, open Settings ▸ Network for the QR, IP and access code.",
+                    "貼士：喺打印機開 設定 ▸ 網絡，可見 QR、IP 同存取碼。"))
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
                     label = { Text(Bi("Name (optional)", "名稱（可選）").inline) },
@@ -125,6 +127,8 @@ fun DeviceScreen(vm: DeviceViewModel = viewModel()) {
                 OutlinedTextField(
                     value = serial, onValueChange = { serial = it },
                     label = { Text(Bi("Printer serial", "打印機序號").inline) },
+                    supportingText = { Text(Bi("Code like 01P00A… on the sticker or Settings ▸ Device.",
+                        "類似 01P00A… 喺機底貼紙或 設定 ▸ 裝置。").inline) },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                 )
                 OutlinedTextField(
@@ -135,6 +139,8 @@ fun DeviceScreen(vm: DeviceViewModel = viewModel()) {
                 OutlinedTextField(
                     value = accessCode, onValueChange = { accessCode = it },
                     label = { Text(Bi("Access code (LAN)", "存取碼（LAN）").inline) },
+                    supportingText = { Text(Bi("8-digit code on the printer: Settings ▸ Network ▸ LAN-only.",
+                        "打印機上嘅 8 位數字碼：設定 ▸ 網絡 ▸ LAN 模式。").inline) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                 )

@@ -44,6 +44,7 @@ fun PrepareScreen(
     vm: PrepareViewModel = viewModel(),
     onOpenHub: () -> Unit = {},
     onOpenPreview: () -> Unit = {},
+    onOpenEditor: () -> Unit = {},
 ) {
     val models by vm.models.collectAsState()
     val message by vm.message.collectAsState()
@@ -63,6 +64,10 @@ fun PrepareScreen(
     ) {
         item {
             BiText(Bi("Prepare", "準備"), enSize = MaterialTheme.typography.headlineSmall.fontSize)
+        }
+        item {
+            BiBody(Bi("How it works: 1) Import a model  2) Slice  3) Preview  4) Print on your printer.",
+                "用法：1) 匯入模型  2) 切片  3) 預覽  4) 喺打印機列印。"))
         }
         message?.let { item { Text(it, style = MaterialTheme.typography.labelLarge) } }
 
@@ -100,8 +105,23 @@ fun PrepareScreen(
             }
             items(models) { m -> ModelRow(m) { vm.remove(m) } }
             item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedButton(onClick = onOpenEditor) {
+                        Text(Bi("Edit slice settings", "編輯切片設定").inline)
+                    }
+                }
+            }
+            item {
                 Button(onClick = { vm.slice() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(Bi("Slice", "切片").inline)
+                    Text(Bi("Slice → Preview", "切片 → 預覽").inline)
+                }
+            }
+        } else {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    BiBody(Bi("No model yet — tap \"Import a model\" above to start.",
+                        "未有模型 — 撳上面「匯入模型」開始。"),
+                        modifier = Modifier.padding(14.dp))
                 }
             }
         }

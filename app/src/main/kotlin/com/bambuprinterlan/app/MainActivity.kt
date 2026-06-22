@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        ModelEditStore.init(applicationContext)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -118,6 +119,7 @@ fun BambuPrinterLanApp() {
                 PrepareScreen(
                     onOpenHub = { navController.navigate("filehub") },
                     onOpenPreview = { navController.navigate(Dest.Preview.route) },
+                    onOpenEditor = { navController.navigate("modeledit") },
                 )
             }
             composable(Dest.Preview.route) {

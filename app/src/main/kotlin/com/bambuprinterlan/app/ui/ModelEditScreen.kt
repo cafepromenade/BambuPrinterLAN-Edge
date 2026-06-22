@@ -105,22 +105,33 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BiText(Bi("Slice settings", "切片設定"))
                 Labeled(Bi("Layer height", "層高"), "${s.layerHeight} mm")
+                Hint(Bi("Thinner = smoother but slower. 0.2 mm is a good default.",
+                    "越薄越平滑但越慢。0.2 毫米適合大多數情況。"))
                 Slider(s.layerHeight, { v ->
                     ModelEditStore.update { it.copy(layerHeight = (Math.round(v * 100) / 100f)) }
                 }, valueRange = 0.08f..0.32f)
                 Labeled(Bi("Infill", "填充"), "${s.infill}%")
+                Hint(Bi("How solid inside. 15% is fine for most prints; more = stronger & heavier.",
+                    "內部實心程度。15% 適合大多數；越高越堅固越重。"))
                 Slider(s.infill.toFloat(), { v -> ModelEditStore.update { it.copy(infill = v.toInt()) } },
                     valueRange = 0f..100f)
                 Labeled(Bi("Walls", "牆數"), "${s.walls}")
+                Hint(Bi("Number of outer shells. 2–3 is typical.", "外殼層數。一般 2–3 層。"))
                 Slider(s.walls.toFloat(), { v -> ModelEditStore.update { it.copy(walls = v.toInt().coerceIn(1, 5)) } },
                     valueRange = 1f..5f)
-                Labeled(Bi("Brim", "裙邊"), "${s.brim}")
+                Labeled(Bi("Brim", "邊緣"), "${s.brim}")
+                Hint(Bi("Extra ring attached to the part to stop it lifting. 0 = off.",
+                    "貼住部件嘅額外邊圈，防止翹起。0 = 關閉。"))
                 Slider(s.brim.toFloat(), { v -> ModelEditStore.update { it.copy(brim = v.toInt().coerceIn(0, 10)) } },
                     valueRange = 0f..10f)
-                Labeled(Bi("Skirt", "圍裙"), "${s.skirt}")
+                Labeled(Bi("Skirt", "裙邊"), "${s.skirt}")
+                Hint(Bi("A loop around the part to prime the nozzle. 0 = off.",
+                    "圍住部件嘅一圈，用嚟順滑出料。0 = 關閉。"))
                 Slider(s.skirt.toFloat(), { v -> ModelEditStore.update { it.copy(skirt = v.toInt().coerceIn(0, 5)) } },
                     valueRange = 0f..5f)
                 Labeled(Bi("Flow ratio", "流量比"), "${(s.flowRatio * 100).toInt()}%")
+                Hint(Bi("Fine-tune how much plastic comes out. Leave at 100% unless tuning.",
+                    "微調出料份量。除非校正，否則保持 100%。"))
                 Slider(s.flowRatio, { v -> ModelEditStore.update { it.copy(flowRatio = (Math.round(v * 100) / 100f)) } },
                     valueRange = 0.9f..1.1f)
                 Labeled(Bi("Nozzle °C", "噴嘴 °C"), "${s.nozzleTemp}")
@@ -132,6 +143,12 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
             }
         }
     }
+}
+
+@Composable
+private fun Hint(text: Bi) {
+    Text(text.inline, style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

@@ -63,6 +63,8 @@ fun FilamentScreen(onBack: () -> Unit = {}) {
             BiText(Bi("Filament / AMS", "線材 / AMS"),
                 enSize = MaterialTheme.typography.headlineSmall.fontSize)
         }
+        BiBody(Bi("AMS = Automatic Material System, the spool changer. Lower humidity is better (under ~20% keeps filament dry).",
+            "AMS = 自動換料系統（換卷器）。濕度越低越好（低於約 20% 可保持乾燥）。"))
 
         if (!CommandBus.connected) {
             BiBody(Bi("Connect a printer on the Device tab to manage filament.",

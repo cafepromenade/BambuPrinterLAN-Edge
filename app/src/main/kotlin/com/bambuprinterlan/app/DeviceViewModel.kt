@@ -168,7 +168,8 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                         updateNotification(st)
                     }
                 }.onFailure {
-                    _message.value = "$label stream error  串流錯誤"
+                    _message.value =
+                        "Lost connection. Check the printer is on and on the same Wi-Fi, then reconnect.  連線中斷，請確認打印機已開並同一 Wi-Fi，再重新連線。"
                     _connected.value = false
                 }
             }
