@@ -20,14 +20,20 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 /**
  * DataStore-backed app settings — the Android equivalent of libslic3r AppConfig.
  * Keys and defaults mirror [SettingsDefaults] so `.bambulan` import/export stays
- * compatible. Secrets (tokens/access codes) are NOT stored here; they live in
- * EncryptedSharedPreferences (plan §11).
+ * compatible. Secret values (tokens / API keys) are encrypted at rest with an
+ * Android Keystore key (see [SecretCrypto]) and never exported in `.bambulan`.
  */
 class SettingsRepository(private val context: Context) {
 
+    /** Keys whose values are encrypted at rest via the Android Keystore. */
+    private val secretKeys = setOf(
+        "relay_token", "home_assistant_token", "anthropic_api_key", "discord_webhook_url",
+    )
+
     fun getString(key: String): Flow<String> =
         context.dataStore.data.map { prefs ->
-            prefs[stringPreferencesKey(key)] ?: SettingsDefaults.strings[key] ?: ""
+            val raw = prefs[stringPreferencesKey(key)] ?: SettingsDefaults.strings[key] ?: ""
+            if (key in secretKeys) SecretCrypto.decrypt(raw) else raw
         }
 
     fun getBool(key: String): Flow<Boolean> =
@@ -50,7 +56,8 @@ class SettingsRepository(private val context: Context) {
         }
 
     suspend fun setString(key: String, value: String) {
-        context.dataStore.edit { it[stringPreferencesKey(key)] = value }
+        val stored = if (key in secretKeys) SecretCrypto.encrypt(value) else value
+        context.dataStore.edit { it[stringPreferencesKey(key)] = stored }
     }
 
     suspend fun setBool(key: String, value: Boolean) {
@@ -73,7 +80,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun exportAll(): BambuLanBundle.Imported {
         val prefs = context.dataStore.data.first()
         val strings = SettingsDefaults.strings.mapValues { (k, d) ->
-            prefs[stringPreferencesKey(k)] ?: d
+            // Never export secrets in a shareable .bambulan bundle.
+            if (k in secretKeys) "" else prefs[stringPreferencesKey(k)] ?: d
         }
         val booleans = SettingsDefaults.booleans.mapValues { (k, d) ->
             prefs[booleanPreferencesKey(k)] ?: d
@@ -146,7 +154,10 @@ class SettingsRepository(private val context: Context) {
     /** Apply an imported `.bambulan` bundle, persisting every key it carries. */
     suspend fun importAll(data: BambuLanBundle.Imported) {
         context.dataStore.edit { prefs ->
-            data.strings.forEach { (k, v) -> prefs[stringPreferencesKey(k)] = v }
+            data.strings.forEach { (k, v) ->
+                if (k in secretKeys && v.isBlank()) return@forEach  // don't wipe existing secret
+                prefs[stringPreferencesKey(k)] = if (k in secretKeys) SecretCrypto.encrypt(v) else v
+            }
             data.booleans.forEach { (k, v) -> prefs[booleanPreferencesKey(k)] = v }
             data.ints.forEach { (k, v) -> prefs[intPreferencesKey(k)] = v }
             data.features.forEach { (k, v) -> prefs[booleanPreferencesKey(k)] = v }

@@ -57,7 +57,7 @@ val HA_DOMAINS = listOf(
 /**
  * Backs both the Tools/Labs feature toggles and the Settings screen, persisting
  * to DataStore (:core:data). Mirrors BambuLan Feature Settings + the app config
- * keys. Secrets are persisted on-device only (TODO: EncryptedSharedPreferences).
+ * keys. Secret values are encrypted at rest with an Android Keystore key (SecretCrypto).
  */
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = SettingsRepository(app)
