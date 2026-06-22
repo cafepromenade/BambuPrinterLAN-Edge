@@ -10,6 +10,9 @@ import java.nio.ByteOrder
 class Mesh(val tris: FloatArray) {           // 9 floats per triangle
     val count = tris.size / 9
     var cx = 0f; var cy = 0f; var cz = 0f; var radius = 1f
+    var minX = 0f; var maxX = 0f; var minY = 0f; var maxY = 0f; var minZ = 0f; var maxZ = 0f
+    val width get() = maxX - minX
+    val depth get() = maxY - minY
     init {
         if (count > 0) {
             var minx = Float.MAX_VALUE; var miny = Float.MAX_VALUE; var minz = Float.MAX_VALUE
@@ -22,6 +25,7 @@ class Mesh(val tris: FloatArray) {           // 9 floats per triangle
                 if (z < minz) minz = z; if (z > maxz) maxz = z
                 i += 3
             }
+            minX = minx; maxX = maxx; minY = miny; maxY = maxy; minZ = minz; maxZ = maxz
             cx = (minx + maxx) / 2; cy = (miny + maxy) / 2; cz = (minz + maxz) / 2
             val dx = maxx - minx; val dy = maxy - miny; val dz = maxz - minz
             radius = (maxOf(dx, dy, dz) / 2).coerceAtLeast(0.001f)

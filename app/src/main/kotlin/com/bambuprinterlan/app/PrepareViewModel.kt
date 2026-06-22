@@ -132,21 +132,35 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = "Engine slices STL/OBJ/3MF; $ext support is coming  暫支援 STL／OBJ／3MF"
             return
         }
+        // Multi-object: auto-arrange every mesh model onto one plate.
+        val meshModels = _models.value.filter {
+            it.name.substringAfterLast('.', "").lowercase() in setOf("stl", "obj", "3mf")
+        }
+        val multi = meshModels.size > 1
+        val label = if (multi) "${meshModels.size} models" else model.name
         viewModelScope.launch {
-            _message.value = "Slicing ${model.name}…  切片緊…"
+            _message.value = "Slicing $label…  切片緊…"
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val ctx = getApplication<Application>()
-                    val input = File(ctx.cacheDir, "input.$ext")
-                    ctx.contentResolver.openInputStream(Uri.parse(model.uri))?.use { src ->
-                        input.outputStream().use { src.copyTo(it) }
-                    } ?: error("Could not read model")
-                    // 3MF: unzip + parse mesh -> binary STL the engine slices.
-                    val meshFile = if (ext == "3mf") {
-                        val stl = File(ctx.cacheDir, "input3mf.stl")
-                        if (!Mesh3mf.toStl(input.inputStream(), stl)) error("Could not parse 3MF")
-                        stl
-                    } else input
+                    val meshFile: File
+                    if (multi) {
+                        val combined = File(ctx.cacheDir, "combined.stl")
+                        val items = meshModels.map { it.uri to it.name.substringAfterLast('.', "").lowercase() }
+                        if (!ModelArranger.combine(ctx, items, combined)) error("Could not arrange models")
+                        meshFile = combined
+                    } else {
+                        val input = File(ctx.cacheDir, "input.$ext")
+                        ctx.contentResolver.openInputStream(Uri.parse(model.uri))?.use { src ->
+                            input.outputStream().use { src.copyTo(it) }
+                        } ?: error("Could not read model")
+                        // 3MF: unzip + parse mesh -> binary STL the engine slices.
+                        meshFile = if (ext == "3mf") {
+                            val stl = File(ctx.cacheDir, "input3mf.stl")
+                            if (!Mesh3mf.toStl(input.inputStream(), stl)) error("Could not parse 3MF")
+                            stl
+                        } else input
+                    }
                     val out = File(ctx.cacheDir, "output.gcode")
                     val layers = com.bambuprinterlan.engine.SlicerBridge.slice(
                         meshFile.absolutePath, out.absolutePath, ModelEditStore.configIni(),
@@ -157,7 +171,7 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             result.onSuccess { (layers, out) ->
                 if (layers >= 0) {
                     val head = runCatching { out.useLines { it.take(40).joinToString("\n") } }.getOrDefault("")
-                    SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head))
+                    SliceStore.set(SliceResult(label, out.absolutePath, layers, out.length(), head))
                     _sliced.tryEmit(Unit)
                     _message.value = "Sliced: $layers layers → ${out.name} (${out.length() / 1024} KB)  已切片"
                 } else _message.value =
