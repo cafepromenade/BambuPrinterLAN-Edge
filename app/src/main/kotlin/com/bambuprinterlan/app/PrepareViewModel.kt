@@ -171,7 +171,8 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             result.onSuccess { (layers, out) ->
                 if (layers >= 0) {
                     val head = runCatching { out.useLines { it.take(40).joinToString("\n") } }.getOrDefault("")
-                    SliceStore.set(SliceResult(label, out.absolutePath, layers, out.length(), head))
+                    val (m, g, mins) = estimate(out)
+                    SliceStore.set(SliceResult(label, out.absolutePath, layers, out.length(), head, m, g, mins))
                     _sliced.tryEmit(Unit)
                     _message.value = "Sliced: $layers layers → ${out.name} (${out.length() / 1024} KB)  已切片"
                 } else _message.value =
@@ -181,6 +182,39 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /** Estimate filament (m, g) and time (min) by walking the G-code. */
+    private fun estimate(out: File): Triple<Float, Float, Int> = runCatching {
+        var x = 0f; var y = 0f; var z = 0f; var feed = 1500f
+        var eSum = 0f; var seconds = 0f
+        val rel = BooleanArray(1) { true }  // engine uses M83 (relative E)
+        out.useLines { lines ->
+            lines.forEach { raw ->
+                val ln = raw.substringBefore(';').trim()
+                if (ln.startsWith("M82")) rel[0] = false
+                else if (ln.startsWith("M83")) rel[0] = true
+                else if (ln.startsWith("G0") || ln.startsWith("G1")) {
+                    var nx = x; var ny = y; var nz = z; var e = 0f
+                    ln.split(' ').forEach { tok ->
+                        when (tok.firstOrNull()) {
+                            'X' -> tok.drop(1).toFloatOrNull()?.let { nx = it }
+                            'Y' -> tok.drop(1).toFloatOrNull()?.let { ny = it }
+                            'Z' -> tok.drop(1).toFloatOrNull()?.let { nz = it }
+                            'E' -> tok.drop(1).toFloatOrNull()?.let { e = it }
+                            'F' -> tok.drop(1).toFloatOrNull()?.let { feed = it }
+                        }
+                    }
+                    val dist = kotlin.math.sqrt((nx - x) * (nx - x) + (ny - y) * (ny - y) + (nz - z) * (nz - z))
+                    if (feed > 0f) seconds += dist / (feed / 60f)
+                    if (e > 0f) eSum += if (rel[0]) e else 0f  // count positive relative extrusion
+                    x = nx; y = ny; z = nz
+                }
+            }
+        }
+        val meters = eSum / 1000f
+        val grams = (eSum * 2.405f) / 1000f * 1.24f      // volume(mm3)->cm3 * PLA density
+        Triple(meters, grams, (seconds / 60f).toInt())
+    }.getOrDefault(Triple(0f, 0f, 0))
 
     /** Load an existing .gcode directly (no slicing) and jump to Preview. */
     private fun loadGcode(model: ImportedModel) {
@@ -208,7 +242,8 @@ class PrepareViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             result.onSuccess { (layers, out, head) ->
-                SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head))
+                val (m, g, mins) = estimate(out)
+                SliceStore.set(SliceResult(model.name, out.absolutePath, layers, out.length(), head, m, g, mins))
                 _sliced.tryEmit(Unit)
                 _message.value = "Loaded G-code: $layers layers  已載入 G-code"
             }.onFailure { _message.value = "Couldn't read this G-code.  無法讀取此 G-code。" }

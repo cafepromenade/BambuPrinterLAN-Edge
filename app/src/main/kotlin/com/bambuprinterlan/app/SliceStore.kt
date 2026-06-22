@@ -11,6 +11,9 @@ data class SliceResult(
     val layers: Int,
     val bytes: Long,
     val gcodeHead: String,
+    val filamentMeters: Float = 0f,
+    val grams: Float = 0f,
+    val minutes: Int = 0,
 )
 
 /** Process-wide holder for the latest slice so Preview/print can read it. */

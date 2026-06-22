@@ -51,6 +51,14 @@ fun PreviewScreen(onOpenDevice: () -> Unit = {}) {
                         Stat(Bi("Layers", "層數"), s.layers.toString())
                         Stat(Bi("G-code", "G-code"), "${s.bytes / 1024} KB")
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier.padding(top = 8.dp)) {
+                        val hrs = s.minutes / 60; val mins = s.minutes % 60
+                        Stat(Bi("Est. time", "預計時間"),
+                            if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m")
+                        Stat(Bi("Filament", "線材"), "%.1f m".format(s.filamentMeters))
+                        Stat(Bi("Weight", "重量"), "%.0f g".format(s.grams))
+                    }
                 }
             }
             Card(Modifier.fillMaxWidth()) {
