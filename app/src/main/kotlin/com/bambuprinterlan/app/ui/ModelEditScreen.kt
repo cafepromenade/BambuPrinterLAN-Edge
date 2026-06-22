@@ -128,6 +128,22 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BiText(Bi("Slice settings", "切片設定"))
+                Hint(Bi("Quick presets — or fine-tune below.", "快速預設 — 或喺下面微調。"))
+                val presets = listOf(
+                    Bi("Draft", "草稿") to Triple(0.28f, 10, 2),
+                    Bi("Standard", "標準") to Triple(0.20f, 15, 2),
+                    Bi("Quality", "精細") to Triple(0.12f, 15, 3),
+                    Bi("Strong", "堅固") to Triple(0.20f, 40, 4),
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    presets.forEach { (label, vals) ->
+                        val (lh, inf, wl) = vals
+                        val selected = s.layerHeight == lh && s.infill == inf && s.walls == wl
+                        FilterChip(selected = selected, onClick = {
+                            ModelEditStore.update { it.copy(layerHeight = lh, infill = inf, walls = wl) }
+                        }, label = { Text(label.inline) })
+                    }
+                }
                 Labeled(Bi("Layer height", "層高"), "${s.layerHeight} mm")
                 Hint(Bi("Thinner = smoother but slower. 0.2 mm is a good default.",
                     "越薄越平滑但越慢。0.2 毫米適合大多數情況。"))
