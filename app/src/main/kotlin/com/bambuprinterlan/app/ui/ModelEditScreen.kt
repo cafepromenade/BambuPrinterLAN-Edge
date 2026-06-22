@@ -148,6 +148,24 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                             label = { Text(p.inline) })
                     }
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(Bi("Ironing (smooth top)", "熨平（平滑頂面）").inline,
+                            style = MaterialTheme.typography.labelLarge)
+                        Hint(Bi("Extra fine pass over the top for a smoother finish.",
+                            "頂面額外幼細掃一次，更平滑。"))
+                    }
+                    Switch(s.ironing, { v -> ModelEditStore.update { it.copy(ironing = v) } })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(Bi("Inner walls first", "先打內牆").inline,
+                            style = MaterialTheme.typography.labelLarge)
+                        Hint(Bi("Print inner walls before the outer wall (better dimensions).",
+                            "先打內牆再外牆（尺寸更準）。"))
+                    }
+                    Switch(s.innerWallsFirst, { v -> ModelEditStore.update { it.copy(innerWallsFirst = v) } })
+                }
                 Labeled(Bi("Brim", "邊緣"), "${s.brim}")
                 Hint(Bi("Extra ring attached to the part to stop it lifting. 0 = off.",
                     "貼住部件嘅額外邊圈，防止翹起。0 = 關閉。"))

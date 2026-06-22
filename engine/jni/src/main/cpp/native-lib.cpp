@@ -173,6 +173,8 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int pattern = (int)cfg(ini, "infill_pattern", 0);  // 0 line,1 grid,2 tri,3 star,4 concentric
     int seam = (int)cfg(ini, "seam_position", 0);      // 0 nearest, 1 back, 2 front
     int wallOrder = (int)cfg(ini, "wall_order", 0);    // 0 outer-first, 1 inner-first
+    int iron = (int)cfg(ini, "ironing", 0);            // smooth the top surface
+    float ironFlow = cfg(ini, "iron_flow", 0.15f);
     float skirtGap = cfg(ini, "skirt_gap", 3.f);
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
@@ -211,6 +213,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     g << "G21\nG90\nM82\nG28\nG92 E0\n";
     g << "G1 Z0.2 F600\nG1 X5 Y5 F3000\nG1 X150 Y5 E15 F1000\nG92 E0\nM83\n";
 
+    float flowMul = 1.f;  // scaled down during the ironing pass
     auto emit_path = [&](const std::vector<Pt>& pts, bool close) {
         if (pts.size() < 2) return;
         g << "G1 E-0.8 F1800\n";
@@ -221,7 +224,7 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
             const Pt& a = pts[(i - 1) % pts.size()]; const Pt& b = pts[i % pts.size()];
             float dx = b.x - a.x, dy = b.y - a.y; float d = std::sqrt(dx * dx + dy * dy);
             if (d < 1e-4f) continue;
-            g << "G1 X" << b.x << " Y" << b.y << " E" << (d * e_mm) << " F1500\n";
+            g << "G1 X" << b.x << " Y" << b.y << " E" << (d * e_mm * flowMul) << " F1500\n";
         }
     };
 
@@ -368,6 +371,13 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
                 }
                 default:  // 0 = line, alternating per layer
                     infill_angle((li % 2) ? 90.f : 0.f, base); break;
+            }
+            // ironing: fine low-flow pass over the very top surface
+            if (iron && z > height - lh * 1.0f) {
+                g << "; ironing\n";
+                flowMul = ironFlow;
+                infill_angle(45.f, lw * 0.3f);
+                flowMul = 1.f;
             }
         }
     }
