@@ -137,6 +137,17 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                 Hint(Bi("Number of outer shells. 2–3 is typical.", "外殼層數。一般 2–3 層。"))
                 Slider(s.walls.toFloat(), { v -> ModelEditStore.update { it.copy(walls = v.toInt().coerceIn(1, 5)) } },
                     valueRange = 1f..5f)
+                Labeled(Bi("Seam", "接縫"), "")
+                Hint(Bi("Where each layer's start mark sits. Back hides it from view.",
+                    "每層起點痕跡嘅位置。「後方」可避開視線。"))
+                val seams = listOf(Bi("Nearest", "最近"), Bi("Back", "後方"), Bi("Front", "前方"))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    seams.forEachIndexed { i, p ->
+                        FilterChip(selected = s.seam == i,
+                            onClick = { ModelEditStore.update { it.copy(seam = i) } },
+                            label = { Text(p.inline) })
+                    }
+                }
                 Labeled(Bi("Brim", "邊緣"), "${s.brim}")
                 Hint(Bi("Extra ring attached to the part to stop it lifting. 0 = off.",
                     "貼住部件嘅額外邊圈，防止翹起。0 = 關閉。"))

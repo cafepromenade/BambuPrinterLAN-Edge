@@ -171,6 +171,8 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int brim = std::max(0, (int)cfg(ini, "brim_loops", 0));
     int skirt = std::max(0, (int)cfg(ini, "skirt_loops", 0));
     int pattern = (int)cfg(ini, "infill_pattern", 0);  // 0 line,1 grid,2 tri,3 star,4 concentric
+    int seam = (int)cfg(ini, "seam_position", 0);      // 0 nearest, 1 back, 2 front
+    int wallOrder = (int)cfg(ini, "wall_order", 0);    // 0 outer-first, 1 inner-first
     float skirtGap = cfg(ini, "skirt_gap", 3.f);
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
@@ -270,11 +272,12 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
             }
         }
 
-        // perimeters: outer loop + inward offsets toward centroid
+        // perimeters: N walls, with seam placement and wall ordering.
         for (const Loop& lp : loops) {
             if (lp.size() < 3) continue;
             float gx = 0, gy = 0; for (const Pt& p : lp) { gx += p.x; gy += p.y; }
             gx /= lp.size(); gy /= lp.size();
+            std::vector<Loop> rings;
             for (int w = 0; w < walls; ++w) {
                 float off = w * lw;
                 Loop ring; ring.reserve(lp.size());
@@ -283,8 +286,17 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
                     float k = dl > off ? (dl - off) / dl : 0.f;
                     ring.push_back({gx + dx * k, gy + dy * k});
                 }
-                emit_path(ring, true);
+                // seam: rotate ring to start at back (max y) or front (min y)
+                if (seam == 1 || seam == 2) {
+                    size_t best = 0;
+                    for (size_t i = 1; i < ring.size(); ++i)
+                        if (seam == 1 ? ring[i].y > ring[best].y : ring[i].y < ring[best].y) best = i;
+                    std::rotate(ring.begin(), ring.begin() + best, ring.end());
+                }
+                rings.push_back(std::move(ring));
             }
+            if (wallOrder == 1) std::reverse(rings.begin(), rings.end());  // inner-first
+            for (const Loop& ring : rings) emit_path(ring, true);
         }
 
         // infill: even-odd scanline at an arbitrary angle; solid on top/bottom.
