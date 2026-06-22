@@ -180,17 +180,24 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
     int nozzleT = (int)cfg(ini, "nozzle_temp", 220);
     int bedT = (int)cfg(ini, "bed_temp", 60);
     float scale = cfg(ini, "scale", 1.0f); if (scale <= 0) scale = 1.f;
-    float rot = cfg(ini, "rotate_z", 0.f) * 3.14159265f / 180.f;
+    const float D2R = 3.14159265f / 180.f;
+    float rot = cfg(ini, "rotate_z", 0.f) * D2R;
+    float rotX = cfg(ini, "rotate_x", 0.f) * D2R;
+    float rotY = cfg(ini, "rotate_y", 0.f) * D2R;
     float moveX = cfg(ini, "move_x", 0.f), moveY = cfg(ini, "move_y", 0.f);
     float cx = cfg(ini, "plate_x", 128.f), cy = cfg(ini, "plate_y", 128.f);
     bool center = cfg(ini, "center", 1.f) != 0.f;
 
-    // ---- transform: scale, rotate-Z ----
+    // ---- transform: scale, rotate X -> Y -> Z ----
     float cosr = std::cos(rot), sinr = std::sin(rot);
+    float cX = std::cos(rotX), sX = std::sin(rotX);
+    float cY = std::cos(rotY), sY = std::sin(rotY);
     float minx = 1e30f, maxx = -1e30f, miny = 1e30f, maxy = -1e30f, minz = 1e30f, maxz = -1e30f;
     for (Tri& t : tris) for (int k = 0; k < 3; ++k) {
         float x = t.v[k].x * scale, y = t.v[k].y * scale, z = t.v[k].z * scale;
-        t.v[k].x = x * cosr - y * sinr; t.v[k].y = x * sinr + y * cosr; t.v[k].z = z;
+        float y1 = y * cX - z * sX, z1 = y * sX + z * cX;        // rotate X
+        float x2 = x * cY + z1 * sY, z2 = -x * sY + z1 * cY;     // rotate Y
+        t.v[k].x = x2 * cosr - y1 * sinr; t.v[k].y = x2 * sinr + y1 * cosr; t.v[k].z = z2;  // rotate Z
         minx = std::fmin(minx, t.v[k].x); maxx = std::fmax(maxx, t.v[k].x);
         miny = std::fmin(miny, t.v[k].y); maxy = std::fmax(maxy, t.v[k].y);
         minz = std::fmin(minz, t.v[k].z); maxz = std::fmax(maxz, t.v[k].z);

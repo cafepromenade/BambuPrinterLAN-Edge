@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class EditState(
     val scale: Float = 1f,
     val rotateZ: Float = 0f,
+    val rotateX: Float = 0f,
+    val rotateY: Float = 0f,
     val moveX: Float = 0f,
     val moveY: Float = 0f,
     val center: Boolean = true,
@@ -47,6 +49,8 @@ object ModelEditStore {
             _state.value = EditState(
                 scale = p.getFloat("scale", 1f),
                 rotateZ = p.getFloat("rotateZ", 0f),
+                rotateX = p.getFloat("rotateX", 0f),
+                rotateY = p.getFloat("rotateY", 0f),
                 moveX = p.getFloat("moveX", 0f),
                 moveY = p.getFloat("moveY", 0f),
                 center = p.getBoolean("center", true),
@@ -72,6 +76,7 @@ object ModelEditStore {
         _state.value = s
         prefs?.edit()?.apply {
             putFloat("scale", s.scale); putFloat("rotateZ", s.rotateZ)
+            putFloat("rotateX", s.rotateX); putFloat("rotateY", s.rotateY)
             putFloat("moveX", s.moveX); putFloat("moveY", s.moveY); putBoolean("center", s.center)
             putFloat("layerHeight", s.layerHeight); putInt("infill", s.infill); putInt("walls", s.walls)
             putInt("brim", s.brim); putInt("skirt", s.skirt); putInt("infillPattern", s.infillPattern)
@@ -88,6 +93,8 @@ object ModelEditStore {
         buildString {
             append("scale = ").append(scale).append('\n')
             append("rotate_z = ").append(rotateZ).append('\n')
+            append("rotate_x = ").append(rotateX).append('\n')
+            append("rotate_y = ").append(rotateY).append('\n')
             append("move_x = ").append(moveX).append('\n')
             append("move_y = ").append(moveY).append('\n')
             append("center = ").append(if (center) 1 else 0).append('\n')

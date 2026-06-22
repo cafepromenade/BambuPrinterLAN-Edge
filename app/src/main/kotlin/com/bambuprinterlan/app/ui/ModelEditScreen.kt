@@ -77,7 +77,7 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
         Card(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().height(280.dp)) {
                 val mm = mesh
-                if (mm != null) Model3DView(mm, s.scale, s.rotateZ, Modifier.fillMaxSize())
+                if (mm != null) Model3DView(mm, s.scale, s.rotateZ, s.rotateX, s.rotateY, Modifier.fillMaxSize())
                 else BiBody(Bi("Import a model in Prepare to view it in 3D.",
                     "喺準備頁匯入模型即可 3D 預覽。"),
                     modifier = Modifier.align(Alignment.Center).padding(16.dp))
@@ -89,8 +89,12 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                 BiText(Bi("Transform", "變形"))
                 Labeled(Bi("Scale", "縮放"), "${(s.scale * 100).toInt()}%")
                 Slider(s.scale, { v -> ModelEditStore.update { it.copy(scale = v) } }, valueRange = 0.25f..3f)
-                Labeled(Bi("Rotate Z", "旋轉 Z"), "${s.rotateZ.toInt()}°")
+                Labeled(Bi("Rotate Z (flat)", "旋轉 Z（平面）"), "${s.rotateZ.toInt()}°")
                 Slider(s.rotateZ, { v -> ModelEditStore.update { it.copy(rotateZ = v) } }, valueRange = 0f..360f)
+                Labeled(Bi("Rotate X (tilt)", "旋轉 X（前後傾）"), "${s.rotateX.toInt()}°")
+                Slider(s.rotateX, { v -> ModelEditStore.update { it.copy(rotateX = v) } }, valueRange = 0f..360f)
+                Labeled(Bi("Rotate Y (tilt)", "旋轉 Y（左右傾）"), "${s.rotateY.toInt()}°")
+                Slider(s.rotateY, { v -> ModelEditStore.update { it.copy(rotateY = v) } }, valueRange = 0f..360f)
                 Labeled(Bi("Move X", "移動 X"), "${s.moveX.toInt()} mm")
                 Slider(s.moveX, { v -> ModelEditStore.update { it.copy(moveX = v) } }, valueRange = -100f..100f)
                 Labeled(Bi("Move Y", "移動 Y"), "${s.moveY.toInt()} mm")
@@ -100,7 +104,8 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                     Switch(s.center, { v -> ModelEditStore.update { it.copy(center = v) } })
                 }
                 OutlinedButton(onClick = { ModelEditStore.update {
-                    it.copy(scale = 1f, rotateZ = 0f, moveX = 0f, moveY = 0f, center = true)
+                    it.copy(scale = 1f, rotateZ = 0f, rotateX = 0f, rotateY = 0f,
+                        moveX = 0f, moveY = 0f, center = true)
                 } }) { Text(Bi("Reset transform", "重設變形").inline) }
             }
         }

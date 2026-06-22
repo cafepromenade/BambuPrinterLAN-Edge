@@ -26,7 +26,10 @@ import kotlin.math.sqrt
  * Edit transform so edits are reflected live.
  */
 @Composable
-fun Model3DView(mesh: Mesh, userScale: Float, userRotZ: Float, modifier: Modifier = Modifier) {
+fun Model3DView(
+    mesh: Mesh, userScale: Float, userRotZ: Float,
+    userRotX: Float = 0f, userRotY: Float = 0f, modifier: Modifier = Modifier,
+) {
     var azim by remember { mutableFloatStateOf(0.6f) }
     var elev by remember { mutableFloatStateOf(-1.1f) }
     var zoom by remember { mutableFloatStateOf(1f) }
@@ -54,6 +57,9 @@ fun Model3DView(mesh: Mesh, userScale: Float, userRotZ: Float, modifier: Modifie
         val tz = Math.toRadians(userRotZ.toDouble()).toFloat()
         val ca = cos(azim + tz); val sa = sin(azim + tz)
         val ce = cos(elev); val se = sin(elev)
+        val rx = Math.toRadians(userRotX.toDouble()).toFloat()
+        val ry = Math.toRadians(userRotY.toDouble()).toFloat()
+        val crx = cos(rx); val srx = sin(rx); val cry = cos(ry); val sry = sin(ry)
         val light = floatArrayOf(0.3f, 0.4f, 0.85f)
 
         data class Face(val path: Path, val depth: Float, val shade: Float)
@@ -70,9 +76,13 @@ fun Model3DView(mesh: Mesh, userScale: Float, userRotZ: Float, modifier: Modifie
             var nx = 0f; var ny = 0f; var nz = 0f
             val rvx = FloatArray(3); val rvy = FloatArray(3); val rvz = FloatArray(3)
             for (k in 0 until 3) {
-                var x = (mesh.tris[o + k * 3] - mesh.cx) * userScale
-                var y = (mesh.tris[o + k * 3 + 1] - mesh.cy) * userScale
-                var z = (mesh.tris[o + k * 3 + 2] - mesh.cz) * userScale
+                val x0 = (mesh.tris[o + k * 3] - mesh.cx) * userScale
+                val y0 = (mesh.tris[o + k * 3 + 1] - mesh.cy) * userScale
+                val z0 = (mesh.tris[o + k * 3 + 2] - mesh.cz) * userScale
+                // model tilt: rotate X then Y
+                val ya = y0 * crx - z0 * srx; val za = y0 * srx + z0 * crx
+                val x = x0 * cry + za * sry; val z = -x0 * sry + za * cry
+                val y = ya
                 // rotate about Z (azim)
                 val x1 = x * ca - y * sa; val y1 = x * sa + y * ca
                 // rotate about X (elev)
