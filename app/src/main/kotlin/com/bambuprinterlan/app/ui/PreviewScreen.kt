@@ -63,6 +63,12 @@ fun PreviewScreen(onOpenDevice: () -> Unit = {}) {
             }
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
+                    BiText(Bi("Layer preview", "層預覽"))
+                    GcodeLayerView(s.gcodePath, Modifier.fillMaxWidth())
+                }
+            }
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
                     BiText(Bi("G-code (head)", "G-code（開頭）"))
                     Text(
                         s.gcodeHead, style = MaterialTheme.typography.bodySmall,
