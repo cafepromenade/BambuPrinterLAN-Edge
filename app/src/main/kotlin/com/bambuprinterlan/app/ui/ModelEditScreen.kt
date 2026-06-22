@@ -103,10 +103,25 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                     Text(Bi("Center on plate", "置中於打印板").inline, modifier = Modifier.weight(1f))
                     Switch(s.center, { v -> ModelEditStore.update { it.copy(center = v) } })
                 }
-                OutlinedButton(onClick = { ModelEditStore.update {
-                    it.copy(scale = 1f, rotateZ = 0f, rotateX = 0f, rotateY = 0f,
-                        moveX = 0f, moveY = 0f, center = true)
-                } }) { Text(Bi("Reset transform", "重設變形").inline) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { ModelEditStore.update {
+                        it.copy(scale = 1f, rotateZ = 0f, rotateX = 0f, rotateY = 0f,
+                            moveX = 0f, moveY = 0f, center = true)
+                    } }) { Text(Bi("Reset", "重設").inline) }
+                    val mm = mesh
+                    OutlinedButton(enabled = mm != null, onClick = {
+                        mm ?: return@OutlinedButton
+                        val h = mm.maxZ - mm.minZ; val w = mm.width; val d = mm.depth
+                        val smallest = minOf(w, d, h)
+                        ModelEditStore.update {
+                            when (smallest) {
+                                h -> it.copy(rotateX = 0f, rotateY = 0f)   // already shortest up
+                                w -> it.copy(rotateX = 0f, rotateY = 90f)  // lay X-axis down
+                                else -> it.copy(rotateX = 90f, rotateY = 0f) // lay Y-axis down
+                            }
+                        }
+                    }) { Text(Bi("Lay flat (auto)", "自動平放").inline) }
+                }
             }
         }
 
