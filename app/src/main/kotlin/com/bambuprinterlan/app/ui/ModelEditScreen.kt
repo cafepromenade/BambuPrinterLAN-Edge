@@ -148,14 +148,16 @@ fun ModelEditScreen(onBack: () -> Unit = {}) {
                             label = { Text(p.inline) })
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(Bi("Supports", "支撐").inline,
-                            style = MaterialTheme.typography.labelLarge)
-                        Hint(Bi("Auto-generate props under overhangs so they don't sag.",
-                            "喺懸空位自動加支撐，避免下垂。"))
+                Text(Bi("Supports", "支撐").inline, style = MaterialTheme.typography.labelLarge)
+                Hint(Bi("Auto props under overhangs. Plate-only avoids marks on the model.",
+                    "懸空位自動支撐。「只限底板」唔會喺模型上留痕。"))
+                val supportModes = listOf(Bi("Off", "關"), Bi("Everywhere", "全部"), Bi("Plate only", "只限底板"))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    supportModes.forEachIndexed { i, p ->
+                        FilterChip(selected = s.supportMode == i,
+                            onClick = { ModelEditStore.update { it.copy(supportMode = i) } },
+                            label = { Text(p.inline) })
                     }
-                    Switch(s.support, { v -> ModelEditStore.update { it.copy(support = v) } })
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {

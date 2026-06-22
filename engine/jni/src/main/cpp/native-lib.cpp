@@ -273,6 +273,11 @@ Java_com_bambuprinterlan_engine_SlicerBridge_nativeSlice(
                 supportG[k][c] = (!insideG[k][c] && aboveSolid) ? 1 : 0;
             }
         }
+        // support==2: build-plate only — drop columns not grounded on the bed.
+        if (support == 2 && NL > 0) {
+            for (size_t c = 0; c < (size_t)gnx * gny; ++c)
+                if (!supportG[0][c]) for (int k = 0; k < NL; ++k) supportG[k][c] = 0;
+        }
     }
 
     int approxLayers = (int)(height / lh);
