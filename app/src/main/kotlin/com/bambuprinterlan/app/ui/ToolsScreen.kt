@@ -44,6 +44,7 @@ fun ToolsScreen(
     onOpenModelEdit: () -> Unit = {},
     onOpenFilament: () -> Unit = {},
     onOpenCalibration: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
 ) {
     val toggles by vm.flags.collectAsState()
     LazyColumn(
@@ -83,6 +84,11 @@ fun ToolsScreen(
         item {
             androidx.compose.material3.OutlinedButton(onClick = onOpenCalibration, modifier = Modifier.fillMaxWidth()) {
                 Text(Bi("Calibration", "校正").inline)
+            }
+        }
+        item {
+            androidx.compose.material3.OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
+                Text(Bi("Print history", "列印紀錄").inline)
             }
         }
         item {

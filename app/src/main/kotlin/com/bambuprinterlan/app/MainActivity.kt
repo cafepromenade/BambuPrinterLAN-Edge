@@ -39,6 +39,7 @@ import com.bambuprinterlan.app.ui.AssistantScreen
 import com.bambuprinterlan.app.ui.AutoFixScreen
 import com.bambuprinterlan.app.ui.CalibrationScreen
 import com.bambuprinterlan.app.ui.FilamentScreen
+import com.bambuprinterlan.app.ui.HistoryScreen
 import com.bambuprinterlan.app.ui.ModelEditScreen
 import com.bambuprinterlan.app.ui.BatchSenderScreen
 import com.bambuprinterlan.app.ui.DeviceScreen
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ModelEditStore.init(applicationContext)
+        PrintHistoryStore.init(applicationContext)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -144,6 +146,7 @@ fun BambuPrinterLanApp() {
                     onOpenModelEdit = { navController.navigate("modeledit") },
                     onOpenFilament = { navController.navigate("filament") },
                     onOpenCalibration = { navController.navigate("calibration") },
+                    onOpenHistory = { navController.navigate("history") },
                 )
             }
             composable("fidget") {
@@ -160,6 +163,9 @@ fun BambuPrinterLanApp() {
             }
             composable("calibration") {
                 CalibrationScreen(onBack = { navController.popBackStack() })
+            }
+            composable("history") {
+                HistoryScreen(onBack = { navController.popBackStack() })
             }
             composable("autofix") {
                 AutoFixScreen(onBack = { navController.popBackStack() })

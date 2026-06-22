@@ -238,10 +238,14 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         lastState = st.gcodeState
         if (prev == null || prev == st.gcodeState) return
         when (st.gcodeState) {
-            GcodeState.FINISH -> fireEvent(
-                "Print finished  列印完成", st.subtaskName, "project", DiscordClient.Category.PROJECT)
-            GcodeState.FAILED -> fireEvent(
-                "Print failed  列印失敗", st.subtaskName, "errors", DiscordClient.Category.ERROR)
+            GcodeState.FINISH -> {
+                PrintHistoryStore.add(st.subtaskName, "finished", System.currentTimeMillis())
+                fireEvent("Print finished  列印完成", st.subtaskName, "project", DiscordClient.Category.PROJECT)
+            }
+            GcodeState.FAILED -> {
+                PrintHistoryStore.add(st.subtaskName, "failed", System.currentTimeMillis())
+                fireEvent("Print failed  列印失敗", st.subtaskName, "errors", DiscordClient.Category.ERROR)
+            }
             else -> {}
         }
     }
